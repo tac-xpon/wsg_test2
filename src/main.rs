@@ -230,13 +230,18 @@ fn main() {
     let mut offset = 0;
     'main_loop: loop {
         audio_device_a.set_volume(master_volume);
-        let mut pos = t_count * SAMPLES_PER_FRAME + offset;
-        while audio_device_a.current() > pos {
+        let mut pos = (t_count * SAMPLES_PER_FRAME as i32 + offset) as usize;
+        let audio_device_current = audio_device_a.current();
+        while audio_device_current > pos {
             pos += SAMPLES_PER_FRAME;
-            offset += SAMPLES_PER_FRAME;
+            offset += SAMPLES_PER_FRAME as i32;
+        }
+        while pos - audio_device_current > SAMPLES_PER_FRAME * 4 {
+            pos -= SAMPLES_PER_FRAME;
+            offset -= SAMPLES_PER_FRAME as i32;
         }
         bg.1.set_cur_pos(30, 0).put_string(&format!("Volume:{:1}", master_volume), None);
-        bg.1.set_cur_pos(30, 1).put_string(&format!("{:6}", offset), None);
+        bg.1.set_cur_pos(10, 1).put_string(&format!("{:7} {:7} {:5} {:6}", audio_device_current, pos, pos - audio_device_current, offset), None);
         for ch in 0..8 {
             let remain_length = SAMPLES_PER_FRAME - drift[ch];
             let out = {
@@ -284,7 +289,6 @@ fn main() {
 
         {
             let mut idx = buffer_pos;
-            // let mut frame_integrated = 0;
             for i in 0..SAMPLES_PER_FRAME {
                 let mut integrated = 0;
                 for ch_no in 0..8 {
@@ -292,10 +296,8 @@ fn main() {
                         integrated += buffers_i32[ch_no][idx];
                     }
                 }
-                // frame_integrated += integrated;
                 mixed_buffer[i] = (integrated / 8 + SETUP_U16) as u16;
-                idx += 1;
-                idx %= SOUND_BUF_SIZE;
+                idx = (idx + 1) % SOUND_BUF_SIZE;
             }
             buffer_pos = idx;
             audio_device_a.set_data(pos, &mixed_buffer);
