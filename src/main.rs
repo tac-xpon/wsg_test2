@@ -34,8 +34,6 @@ const WINDOW_MARGIN: i32 = 2;
 const BG0_RECT_SIZE: (i32, i32) = (100, 60);
 const BG1_RECT_SIZE: (i32, i32) = (160, 160);
 const MAX_SPRITES: usize = 512;
-// const AUDIO_VOLUME: u16 = 5;
-
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -147,8 +145,9 @@ fn main() {
     let mut audio_device_a = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
 
     const WAVE_DATA_LENGTH: usize = 32;
+    const BASE_FREQ: f64 = SAMPLING_FREQ as f64 / WAVE_DATA_LENGTH as f64;
 
-    let mut wave_data2: SoundData16 = SoundData16::new();
+    let mut wave_data2 = Vec::<i32>::new();
     {
         let wave: [u8; WAVE_DATA_LENGTH] = [
             0x07, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x0c, 0x0c,
@@ -157,11 +156,11 @@ fn main() {
             0x00, 0x02, 0x02, 0x00, 0x00, 0x02, 0x02, 0x03,
         ];
         for a in wave {
-            wave_data2.push(((a + 1) as u16) << 12);
+            wave_data2.push((((a + 1) as i32) << 12) - SETUP_U16);
         }
     }
 
-    let mut wave_data4: SoundData16 = SoundData16::new();
+    let mut wave_data4 = Vec::<i32>::new();
     {
         let wave: [u8; WAVE_DATA_LENGTH] = [
             0x07, 0x0a, 0x0c, 0x0d, 0x0e, 0x0d, 0x0c, 0x0a,
@@ -170,28 +169,7 @@ fn main() {
             0x01, 0x00, 0x01, 0x03, 0x07, 0x0e, 0x07, 0x00,
         ];
         for a in wave {
-            wave_data4.push(((a + 1) as u16) << 12);
-        }
-    }
-
-    let mut music_ch0_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch1_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch2_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch3_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch4_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch5_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch6_flat:Vec<(i32, u16)> = Vec::new();
-    let mut music_ch7_flat:Vec<(i32, u16)> = Vec::new();
-    {
-        for frame in MUSIC {
-            music_ch0_flat.push(frame[0]);
-            music_ch1_flat.push(frame[1]);
-            music_ch2_flat.push(frame[2]);
-            music_ch3_flat.push(frame[3]);
-            music_ch4_flat.push(frame[4]);
-            music_ch5_flat.push(frame[5]);
-            music_ch6_flat.push(frame[6]);
-            music_ch7_flat.push(frame[7]);
+            wave_data4.push((((a + 1) as i32) << 12) - SETUP_U16);
         }
     }
 
@@ -221,9 +199,9 @@ fn main() {
     let mut pointer_pos = (0.0, 0.0);
     let mut master_volume = 4;
     let mut mute = [false, false, false, false, false, false, false, false];
-    //let mut volume = (0i32, 0, 0, 0, 0, 0, 0, 0);
     let mut playing = [false, false, false, false, false, false, false, false];
-    let mut freq = [523.0, 587.0, 659.0, 698.0, 784.0, 880.0, 988.0, 1046.0];
+    let mut freq = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
+    let waveform = [&wave_data4, &wave_data2, &wave_data4, &wave_data2, &wave_data4, &wave_data2, &wave_data2, &wave_data2];
     let mut drift = [0, 0, 0, 0, 0, 0, 0, 0];
     let mut note_pos = [0, 0, 0, 0, 0, 0, 0, 0];
     let mut ch0_buffer_i32 = vec![0; SOUND_BUF_SIZE];
@@ -257,6 +235,7 @@ fn main() {
             pos += SAMPLES_PER_FRAME;
             offset += SAMPLES_PER_FRAME;
         }
+        bg.1.set_cur_pos(30, 0).put_string(&format!("Volume:{:1}", master_volume), None);
         bg.1.set_cur_pos(30, 1).put_string(&format!("{:6}", offset), None);
         for ch in 0..8 {
             let remain_length = SAMPLES_PER_FRAME - drift[ch];
@@ -269,13 +248,17 @@ fn main() {
                     }
                     freq[ch] = f as f64 / 44.0;
                     if freq[ch] > 30.0 {
+                        let f_ratio = BASE_FREQ / freq[ch];
                         let wave_length = SAMPLING_FREQ as f64 / freq[ch];
                         let c = (remain_length as f64 / wave_length).ceil() as usize;
                         let group_length = (wave_length * c as f64).round_ties_even() as usize;
                         for i in 0..group_length {
-                            let x = std::f64::consts::PI * 2.0 * i as f64 / wave_length;
-                            let a = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                            buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = a * v as i32 / 15;
+                            let src_pos = i as f64 / f_ratio;
+                            let src_pos_floor = src_pos as usize;
+                            let sample_0 = waveform[ch][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
+                            let sample_1 = waveform[ch][(src_pos_floor + 1) % WAVE_DATA_LENGTH] as f64;
+                            let a = sample_0 + (sample_1 - sample_0) * (src_pos - src_pos_floor as f64);
+                            buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = (a * v as f64 / 15.0) as i32;
                         }
                         drift[ch] = (group_length - remain_length) % SAMPLES_PER_FRAME;
                         v // emit
@@ -294,11 +277,14 @@ fn main() {
             }
             let y = (5 + ch * 2) as i32;
             bg.1.set_cur_pos(5, y).put_string(&format!("{:7.2}Hz {:3} {:2}", freq[ch], drift[ch], out), None);
-            bg.1.put_code_n('*', out as i32).put_code_n(' ', 15 - out as i32);
+            if !mute[ch] {
+                bg.1.put_code_n('*', out as i32).put_code_n(' ', 15 - out as i32);
+            }
         }
 
         {
             let mut idx = buffer_pos;
+            // let mut frame_integrated = 0;
             for i in 0..SAMPLES_PER_FRAME {
                 let mut integrated = 0;
                 for ch_no in 0..8 {
@@ -306,6 +292,7 @@ fn main() {
                         integrated += buffers_i32[ch_no][idx];
                     }
                 }
+                // frame_integrated += integrated;
                 mixed_buffer[i] = (integrated / 8 + SETUP_U16) as u16;
                 idx += 1;
                 idx %= SOUND_BUF_SIZE;
