@@ -268,7 +268,7 @@ fn main() {
                         playing[ch] = false;
                     }
                     freq[ch] = f as f64 / 44.0;
-                    if freq[ch] > 60.0 {
+                    if freq[ch] > 30.0 {
                         let wave_length = SAMPLING_FREQ as f64 / freq[ch];
                         let c = (remain_length as f64 / wave_length).ceil() as usize;
                         let group_length = (wave_length * c as f64).round_ties_even() as usize;
@@ -277,7 +277,7 @@ fn main() {
                             let a = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
                             buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = a * v as i32 / 15;
                         }
-                        drift[ch] = group_length - remain_length;
+                        drift[ch] = (group_length - remain_length) % SAMPLES_PER_FRAME;
                         v // emit
                     } else {
                         0 // silence
