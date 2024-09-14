@@ -138,6 +138,7 @@ fn main() {
 
     const SAMPLING_FREQ: i32 = 48000;
     const SOUND_BUF_SIZE: usize = 4096;
+    const SAMPLES_PER_FRAME: usize = (SAMPLING_FREQ / 60) as usize;
 
     let mut audio_context = AudioContext::with_subsystem(audio_subsystem);
     audio_context.set_freq(Some(SAMPLING_FREQ));
@@ -173,14 +174,14 @@ fn main() {
         }
     }
 
-    let mut music_ch0_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch1_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch2_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch3_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch4_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch5_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch6_flat:Vec<(u32, u16)> = Vec::new();
-    let mut music_ch7_flat:Vec<(u32, u16)> = Vec::new();
+    let mut music_ch0_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch1_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch2_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch3_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch4_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch5_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch6_flat:Vec<(i32, u16)> = Vec::new();
+    let mut music_ch7_flat:Vec<(i32, u16)> = Vec::new();
     {
         for frame in MUSIC {
             music_ch0_flat.push(frame[0]);
@@ -219,229 +220,93 @@ fn main() {
     let mut t_count = 0;
     let mut pointer_pos = (0.0, 0.0);
     let mut master_volume = 4;
-    let mut mute = (false, false, false, false, false, false, false, false);
+    let mut mute = [false, false, false, false, false, false, false, false];
     //let mut volume = (0i32, 0, 0, 0, 0, 0, 0, 0);
-    let mut playing = (false, false, false, false, false, false, false, false);
-    let mut freq = (523, 587, 659, 698, 784, 880, 988, 1046);
-    let mut drift = (0, 0, 0, 0, 0, 0, 0, 0);
-    let mut note_pos = (0usize, 0, 0, 0, 0, 0, 0, 0);
-    let mut ch0_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch1_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch2_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch3_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch4_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch5_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch6_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut ch7_buffer_i32 = vec![SETUP_U16; SOUND_BUF_SIZE];
-    let mut mixed_buffer: SoundData16 = vec![SETUP_U16 as u16; 800];
+    let mut playing = [false, false, false, false, false, false, false, false];
+    let mut freq = [523.0, 587.0, 659.0, 698.0, 784.0, 880.0, 988.0, 1046.0];
+    let mut drift = [0, 0, 0, 0, 0, 0, 0, 0];
+    let mut note_pos = [0, 0, 0, 0, 0, 0, 0, 0];
+    let mut ch0_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch1_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch2_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch3_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch4_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch5_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch6_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let mut ch7_buffer_i32 = vec![0; SOUND_BUF_SIZE];
+    let buffers_i32 = [
+        &mut ch0_buffer_i32,
+        &mut ch1_buffer_i32,
+        &mut ch2_buffer_i32,
+        &mut ch3_buffer_i32,
+        &mut ch4_buffer_i32,
+        &mut ch5_buffer_i32,
+        &mut ch6_buffer_i32,
+        &mut ch7_buffer_i32,
+    ];
+    let mut mixed_buffer: SoundData16 = vec![SETUP_U16 as u16; SAMPLES_PER_FRAME];
     audio_device_a.resume();
-    /*
-    for i in 0..16 {
-        audio_device_a.set_data(i * sin_wave.len(), &sin_wave);
-    }
-    */
-
-    //const BASE_FREQ: u32 = ((SAMPLING_FREQ / WAVE_DATA_LENGTH as i32) * 44) as u32;
 
     input_role_state.clear_all();
     let mut buffer_pos = 0;
     let mut offset = 0;
     'main_loop: loop {
         audio_device_a.set_volume(master_volume);
-        let mut pos = t_count * 800 + offset;
+        let mut pos = t_count * SAMPLES_PER_FRAME + offset;
         while audio_device_a.current() > pos {
-            pos += 800;
-            offset += 800;
+            pos += SAMPLES_PER_FRAME;
+            offset += SAMPLES_PER_FRAME;
         }
         bg.1.set_cur_pos(30, 1).put_string(&format!("{:6}", offset), None);
-        if playing.0 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.0 as f64;
-                let remain_length = 800 - drift.0 as i32;
-                let c = (remain_length * freq.0) / SAMPLING_FREQ + if (remain_length * freq.0) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch0_buffer_i32[(buffer_pos + drift.0 + i) % SOUND_BUF_SIZE] = y;
+        for ch in 0..8 {
+            let remain_length = SAMPLES_PER_FRAME - drift[ch];
+            let out = {
+                if playing[ch] {
+                    let (f, v) = MUSIC[note_pos[ch]][ch];
+                    note_pos[ch] += 1;
+                    if note_pos[ch] >= MUSIC.len() {
+                        playing[ch] = false;
+                    }
+                    freq[ch] = f as f64 / 44.0;
+                    if freq[ch] > 60.0 {
+                        let wave_length = SAMPLING_FREQ as f64 / freq[ch];
+                        let c = (remain_length as f64 / wave_length).ceil() as usize;
+                        let group_length = (wave_length * c as f64).round_ties_even() as usize;
+                        for i in 0..group_length {
+                            let x = std::f64::consts::PI * 2.0 * i as f64 / wave_length;
+                            let a = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
+                            buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = a * v as i32 / 15;
+                        }
+                        drift[ch] = group_length - remain_length;
+                        v // emit
+                    } else {
+                        0 // silence
+                    }
+                } else {
+                    0 // silence
                 }
-                drift.0 = drift.0 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.0 {
-                ch0_buffer_i32[(buffer_pos + drift.0 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.0 = 0;
-        }
-        bg.1.set_cur_pos(8, 5).put_string(&format!("{:4}Hz", freq.0), None);
-        bg.1.set_cur_pos(26, 5).put_string(&format!("{:4}", drift.0), None);
-
-        if playing.1 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.1 as f64;
-                let remain_length = 800 - drift.1 as i32;
-                let c = (remain_length * freq.1) / SAMPLING_FREQ + if (remain_length * freq.1) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch1_buffer_i32[(buffer_pos + drift.1 + i) % SOUND_BUF_SIZE] = y;
+            };
+            if out == 0 {
+                for i in 0..remain_length {
+                    buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = 0;
                 }
-                drift.1 = drift.1 + group_length - 800;
+                drift[ch] = 0;
             }
-        } else {
-            for i in 0..800 - drift.1 {
-                ch1_buffer_i32[(buffer_pos + drift.1 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.1 = 0;
+            let y = (5 + ch * 2) as i32;
+            bg.1.set_cur_pos(5, y).put_string(&format!("{:7.2}Hz {:3} {:2}", freq[ch], drift[ch], out), None);
+            bg.1.put_code_n('*', out as i32).put_code_n(' ', 15 - out as i32);
         }
-        bg.1.set_cur_pos(8, 7).put_string(&format!("{:4}Hz", freq.1), None);
-        bg.1.set_cur_pos(26, 7).put_string(&format!("{:4}", drift.1), None);
-
-        if playing.2 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.2 as f64;
-                let remain_length = 800 - drift.2 as i32;
-                let c = (remain_length * freq.2) / SAMPLING_FREQ + if (remain_length * freq.2) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch2_buffer_i32[(buffer_pos + drift.2 + i) % SOUND_BUF_SIZE] = y;
-                }
-                drift.2 = drift.2 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.2 {
-                ch2_buffer_i32[(buffer_pos + drift.2 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.2 = 0;
-        }
-        bg.1.set_cur_pos(8, 9).put_string(&format!("{:4}Hz", freq.2), None);
-        bg.1.set_cur_pos(26, 9).put_string(&format!("{:4}", drift.2), None);
-
-        if playing.3 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.3 as f64;
-                let remain_length = 800 - drift.3 as i32;
-                let c = (remain_length * freq.3) / SAMPLING_FREQ + if (remain_length * freq.3) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch3_buffer_i32[(buffer_pos + drift.3 + i) % SOUND_BUF_SIZE] = y;
-                }
-                drift.3 = drift.3 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.3 {
-                ch3_buffer_i32[(buffer_pos + drift.3 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.3 = 0;
-        }
-        bg.1.set_cur_pos(8, 11).put_string(&format!("{:4}Hz", freq.3), None);
-        bg.1.set_cur_pos(26, 11).put_string(&format!("{:4}", drift.3), None);
-
-        if playing.4 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.4 as f64;
-                let remain_length = 800 - drift.4 as i32;
-                let c = (remain_length * freq.4) / SAMPLING_FREQ + if (remain_length * freq.4) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch4_buffer_i32[(buffer_pos + drift.4 + i) % SOUND_BUF_SIZE] = y;
-                }
-                drift.4 = drift.4 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.4 {
-                ch4_buffer_i32[(buffer_pos + drift.4 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.4 = 0;
-        }
-        bg.1.set_cur_pos(8, 13).put_string(&format!("{:4}Hz", freq.4), None);
-        bg.1.set_cur_pos(26, 13).put_string(&format!("{:4}", drift.4), None);
-
-        if playing.5 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.5 as f64;
-                let remain_length = 800 - drift.5 as i32;
-                let c = (remain_length * freq.5) / SAMPLING_FREQ + if (remain_length * freq.5) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch5_buffer_i32[(buffer_pos + drift.5 + i) % SOUND_BUF_SIZE] = y;
-                }
-                drift.5 = drift.5 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.5 {
-                ch5_buffer_i32[(buffer_pos + drift.5 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.5 = 0;
-        }
-        bg.1.set_cur_pos(8, 15).put_string(&format!("{:4}Hz", freq.5), None);
-        bg.1.set_cur_pos(26, 15).put_string(&format!("{:4}", drift.5), None);
-
-        if playing.6 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.6 as f64;
-                let remain_length = 800 - drift.6 as i32;
-                let c = (remain_length * freq.6) / SAMPLING_FREQ + if (remain_length * freq.6) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch6_buffer_i32[(buffer_pos + drift.6 + i) % SOUND_BUF_SIZE] = y;
-                }
-                drift.6 = drift.6 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.6 {
-                ch6_buffer_i32[(buffer_pos + drift.6 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.6 = 0;
-        }
-        bg.1.set_cur_pos(8, 17).put_string(&format!("{:4}Hz", freq.6), None);
-        bg.1.set_cur_pos(26, 17).put_string(&format!("{:4}", drift.6), None);
-
-        if playing.7 {
-            {
-                let sin_wave_length = SAMPLING_FREQ as f64 / freq.7 as f64;
-                let remain_length = 800 - drift.7 as i32;
-                let c = (remain_length * freq.7) / SAMPLING_FREQ + if (remain_length * freq.7) % SAMPLING_FREQ > 0 { 1 } else { 0 };
-                let group_length = (sin_wave_length * c as f64).round_ties_even() as usize;
-                for i in 0..group_length {
-                    let x = std::f64::consts::PI * 2.0 * i as f64 / sin_wave_length;
-                    let y = (x.sin() * (SETUP_U16 - 1) as f64) as i32;
-                    ch7_buffer_i32[(buffer_pos + drift.7 + i) % SOUND_BUF_SIZE] = y;
-                }
-                drift.7 = drift.7 + group_length - 800;
-            }
-        } else {
-            for i in 0..800 - drift.7 {
-                ch7_buffer_i32[(buffer_pos + drift.7 + i) % SOUND_BUF_SIZE] = 0;
-            }
-            drift.7 = 0;
-        }
-        bg.1.set_cur_pos(8, 19).put_string(&format!("{:4}Hz", freq.7), None);
-        bg.1.set_cur_pos(26, 19).put_string(&format!("{:4}", drift.7), None);
 
         {
             let mut idx = buffer_pos;
-            for i in 0..800 {
-                let ch0 = if mute.0 { 0 } else { ch0_buffer_i32[idx] };
-                let ch1 = if mute.1 { 0 } else { ch1_buffer_i32[idx] };
-                let ch2 = if mute.2 { 0 } else { ch2_buffer_i32[idx] };
-                let ch3 = if mute.3 { 0 } else { ch3_buffer_i32[idx] };
-                let ch4 = if mute.4 { 0 } else { ch4_buffer_i32[idx] };
-                let ch5 = if mute.5 { 0 } else { ch5_buffer_i32[idx] };
-                let ch6 = if mute.6 { 0 } else { ch6_buffer_i32[idx] };
-                let ch7 = if mute.7 { 0 } else { ch7_buffer_i32[idx] };
-                mixed_buffer[i] = ((ch0 + ch1 + ch2 + ch3 + ch4 + ch5 + ch6 + ch7) / 8 + SETUP_U16) as u16;
+            for i in 0..SAMPLES_PER_FRAME {
+                let mut integrated = 0;
+                for ch_no in 0..8 {
+                    if !mute[ch_no] {
+                        integrated += buffers_i32[ch_no][idx];
+                    }
+                }
+                mixed_buffer[i] = (integrated / 8 + SETUP_U16) as u16;
                 idx += 1;
                 idx %= SOUND_BUF_SIZE;
             }
@@ -462,22 +327,22 @@ fn main() {
             bg.1.set_cur_pos(m_pos_bgx, m_pos_bgy);
             let (c, p) = (bg.1.read_code(), bg.1.read_palette());
             match (c as u8 as char, p) {
-                ('0', 1) => mute.0 = true,
-                ('0', 5) => mute.0 = false,
-                ('1', 1) => mute.1 = true,
-                ('1', 5) => mute.1 = false,
-                ('2', 1) => mute.2 = true,
-                ('2', 5) => mute.2 = false,
-                ('3', 1) => mute.3 = true,
-                ('3', 5) => mute.3 = false,
-                ('4', 1) => mute.4 = true,
-                ('4', 5) => mute.4 = false,
-                ('5', 1) => mute.5 = true,
-                ('5', 5) => mute.5 = false,
-                ('6', 1) => mute.6 = true,
-                ('6', 5) => mute.6 = false,
-                ('7', 1) => mute.7 = true,
-                ('7', 5) => mute.7 = false,
+                ('0', 1) => mute[0] = true,
+                ('0', 5) => mute[0] = false,
+                ('1', 1) => mute[1] = true,
+                ('1', 5) => mute[1] = false,
+                ('2', 1) => mute[2] = true,
+                ('2', 5) => mute[2] = false,
+                ('3', 1) => mute[3] = true,
+                ('3', 5) => mute[3] = false,
+                ('4', 1) => mute[4] = true,
+                ('4', 5) => mute[4] = false,
+                ('5', 1) => mute[5] = true,
+                ('5', 5) => mute[5] = false,
+                ('6', 1) => mute[6] = true,
+                ('6', 5) => mute[6] = false,
+                ('7', 1) => mute[7] = true,
+                ('7', 5) => mute[7] = false,
                 (_, _) => {},
             }
             match p {
@@ -496,33 +361,11 @@ fn main() {
                 master_volume -= 1;
             }
         }
-        if input_role_state.get(InputRole::Right).0 {
-            if freq.0 < 1450 {
-                freq.0 += 1;
-            }
-        }
-        if input_role_state.get(InputRole::Left).0 {
-            if freq.0 > 100 {
-                freq.0 -= 1;
-            }
-        }
         if input_role_state.get(InputRole::Start).1 & 0b1111 == 0b0011 {
-            playing.0 = !playing.0;
-            note_pos.0 = 0;
-            playing.1 = !playing.1;
-            note_pos.1 = 0;
-            playing.2 = !playing.2;
-            note_pos.2 = 0;
-            playing.3 = !playing.3;
-            note_pos.3 = 0;
-            playing.4 = !playing.4;
-            note_pos.4 = 0;
-            playing.5 = !playing.5;
-            note_pos.5 = 0;
-            playing.6 = !playing.6;
-            note_pos.6 = 0;
-            playing.7 = !playing.7;
-            note_pos.7 = 0;
+            for ch in 0..8 {
+                playing[ch] = !playing[ch];
+                note_pos[ch] = 0;
+            }
         }
 
         if wait_and_update::doing(
