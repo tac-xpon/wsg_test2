@@ -16,6 +16,9 @@ use bgsp_lib2::{bg_plane::*, bgsp_common::*, sp_resources::*};
 
 use audio_lib3::*;
 
+mod wave_data;
+use wave_data::*;
+
 mod music_data;
 use music_data::MUSIC;
 
@@ -34,6 +37,12 @@ const WINDOW_MARGIN: i32 = 2;
 const BG0_RECT_SIZE: (i32, i32) = (100, 60);
 const BG1_RECT_SIZE: (i32, i32) = (160, 160);
 const MAX_SPRITES: usize = 512;
+const SAMPLING_FREQ: i32 = 48000;
+const SOUND_BUF_SIZE: usize = 4096;
+const SAMPLES_PER_FRAME: usize = (SAMPLING_FREQ / 60) as usize;
+const NUM_OF_AUDIO_CHANNELS: usize = 8;
+const BASE_FREQ: f64 = SAMPLING_FREQ as f64 / WAVE_DATA_LENGTH as f64;
+const FREQ_ADJ_RATIO: f64 = 44.0;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -134,44 +143,11 @@ fn main() {
     let rc_sp_texture_bank = Rc::new(RefCell::new(&mut sp_texture_bank));
     let mut spr = SpResources::new(MAX_SPRITES, rc_sp_texture_bank.clone());
 
-    const SAMPLING_FREQ: i32 = 48000;
-    const SOUND_BUF_SIZE: usize = 4096;
-    const SAMPLES_PER_FRAME: usize = (SAMPLING_FREQ / 60) as usize;
-
     let mut audio_context = AudioContext::with_subsystem(audio_subsystem);
     audio_context.set_freq(Some(SAMPLING_FREQ));
     audio_context.set_channels(Some(1));
     audio_context.set_samples(Some(256));
     let mut audio_device_a = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
-
-    const WAVE_DATA_LENGTH: usize = 32;
-    const BASE_FREQ: f64 = SAMPLING_FREQ as f64 / WAVE_DATA_LENGTH as f64;
-
-    let mut wave_data2 = Vec::<i32>::new();
-    {
-        let wave: [u8; WAVE_DATA_LENGTH] = [
-            0x07, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x0c, 0x0c,
-            0x0e, 0x0e, 0x0c, 0x09, 0x07, 0x07, 0x05, 0x05,
-            0x07, 0x09, 0x09, 0x07, 0x07, 0x05, 0x02, 0x00,
-            0x00, 0x02, 0x02, 0x00, 0x00, 0x02, 0x02, 0x03,
-        ];
-        for a in wave {
-            wave_data2.push((((a + 1) as i32) << 12) - SETUP_U16);
-        }
-    }
-
-    let mut wave_data4 = Vec::<i32>::new();
-    {
-        let wave: [u8; WAVE_DATA_LENGTH] = [
-            0x07, 0x0a, 0x0c, 0x0d, 0x0e, 0x0d, 0x0c, 0x0a,
-            0x07, 0x04, 0x02, 0x01, 0x00, 0x01, 0x02, 0x04,
-            0x07, 0x0b, 0x0d, 0x0e, 0x0d, 0x0b, 0x07, 0x03,
-            0x01, 0x00, 0x01, 0x03, 0x07, 0x0e, 0x07, 0x00,
-        ];
-        for a in wave {
-            wave_data4.push((((a + 1) as i32) << 12) - SETUP_U16);
-        }
-    }
 
     if game_window.full_screen() {
         sdl_context.mouse().show_cursor(false);
@@ -182,8 +158,7 @@ fn main() {
     {
         let s = "Test for WSG Play".to_string();
         let x = (VM_RECT_SIZE.0 - s.len() as i32) / 2;
-        bg.1.set_cur_pos(x, 0)
-            .put_string(&s, Some(&CharAttributes::new(3, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(x,  0).put_string(&s,    Some(&CharAttributes::new(3, BgSymmetry::Normal)));
         bg.1.set_cur_pos(3,  5).put_string(&"0:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
         bg.1.set_cur_pos(3,  7).put_string(&"1:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
         bg.1.set_cur_pos(3,  9).put_string(&"2:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
@@ -198,12 +173,11 @@ fn main() {
     let mut t_count = 0;
     let mut pointer_pos = (0.0, 0.0);
     let mut master_volume = 4;
-    let mut mute = [false, false, false, false, false, false, false, false];
-    let mut playing = [false, false, false, false, false, false, false, false];
-    let mut freq = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
-    let waveform = [&wave_data4, &wave_data2, &wave_data4, &wave_data2, &wave_data4, &wave_data2, &wave_data2, &wave_data2];
-    let mut drift = [0, 0, 0, 0, 0, 0, 0, 0];
-    let mut note_pos = [0, 0, 0, 0, 0, 0, 0, 0];
+    let waveform = [&WAVE_0, &WAVE_1, &WAVE_2, &WAVE_3, &WAVE_4, &WAVE_5, &WAVE_6, &WAVE_7];
+    let mut mute = [false; NUM_OF_AUDIO_CHANNELS];
+    let mut drift = [0usize; NUM_OF_AUDIO_CHANNELS];
+    let mut playing = false;
+    let mut note_pos = 0;
     let mut ch0_buffer_i32 = vec![0; SOUND_BUF_SIZE];
     let mut ch1_buffer_i32 = vec![0; SOUND_BUF_SIZE];
     let mut ch2_buffer_i32 = vec![0; SOUND_BUF_SIZE];
@@ -223,13 +197,14 @@ fn main() {
         &mut ch7_buffer_i32,
     ];
     let mut mixed_buffer: SoundData16 = vec![SETUP_U16 as u16; SAMPLES_PER_FRAME];
+
+    audio_device_a.set_volume(master_volume);
     audio_device_a.resume();
 
     input_role_state.clear_all();
     let mut buffer_pos = 0;
     let mut offset = 0;
     'main_loop: loop {
-        audio_device_a.set_volume(master_volume);
         let mut pos = (t_count * SAMPLES_PER_FRAME as i32 + offset) as usize;
         let audio_device_current = audio_device_a.current();
         while audio_device_current > pos {
@@ -240,121 +215,104 @@ fn main() {
             pos -= SAMPLES_PER_FRAME;
             offset -= SAMPLES_PER_FRAME as i32;
         }
-        bg.1.set_cur_pos(30, 0).put_string(&format!("Volume:{:1}", master_volume), None);
-        bg.1.set_cur_pos(10, 1).put_string(&format!("{:7} {:7} {:5} {:6}", audio_device_current, pos, pos - audio_device_current, offset), None);
+        bg.1.set_cur_pos(10, 2).put_string(&format!("{:7} {:7} {:5} {:6}", audio_device_current, pos, pos - audio_device_current, offset), None);
+        bg.1.set_cur_pos(30, 3).put_string(&format!("Volume:{:1}", master_volume), None);
+
+        let sound_data = if playing {
+            note_pos += 1;
+            if note_pos >= MUSIC.len() {
+                playing = false;
+            }
+            MUSIC[note_pos - 1]
+        } else {
+            [(0usize, 0i32, 0u16);8]
+        };
         for ch in 0..8 {
             let remain_length = SAMPLES_PER_FRAME - drift[ch];
+            let buffer_top_current = buffer_pos + drift[ch];
             let out = {
-                if playing[ch] {
-                    let (f, v) = MUSIC[note_pos[ch]][ch];
-                    note_pos[ch] += 1;
-                    if note_pos[ch] >= MUSIC.len() {
-                        playing[ch] = false;
-                    }
-                    freq[ch] = f as f64 / 44.0;
-                    if freq[ch] > 30.0 {
-                        let f_ratio = BASE_FREQ / freq[ch];
-                        let wave_length = SAMPLING_FREQ as f64 / freq[ch];
+                    let (w, f, v) = sound_data[ch];
+                    let freq = f as f64 / FREQ_ADJ_RATIO;
+                    if freq <= 30.0 || w >= NUM_OF_WAVE_FORMS {
+                        None // silence
+                    } else {
+                        let wave_length = SAMPLING_FREQ as f64 / freq;
                         let c = (remain_length as f64 / wave_length).ceil() as usize;
                         let group_length = (wave_length * c as f64).round_ties_even() as usize;
-                        for i in 0..group_length {
-                            let src_pos = i as f64 / f_ratio;
-                            let src_pos_floor = src_pos as usize;
-                            let sample_0 = waveform[ch][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
-                            let sample_1 = waveform[ch][(src_pos_floor + 1) % WAVE_DATA_LENGTH] as f64;
-                            let a = sample_0 + (sample_1 - sample_0) * (src_pos - src_pos_floor as f64);
-                            buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = (a * v as f64 / 15.0) as i32;
+                        if mute[ch] || v == 0 {
+                            for i in 0..group_length {
+                                buffers_i32[ch][(buffer_top_current + i) % SOUND_BUF_SIZE] = 0;
+                            }
+                        } else {
+                            let f_ratio = BASE_FREQ / freq;
+                            for i in 0..group_length {
+                                let src_pos = i as f64 / f_ratio;
+                                let src_pos_floor = src_pos as usize;
+                                let sample_0 = waveform[w][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
+                                let sample_1 = waveform[w][(src_pos_floor + 1) % WAVE_DATA_LENGTH] as f64;
+                                let a = sample_0 + (sample_1 - sample_0) * (src_pos - src_pos_floor as f64);
+                                buffers_i32[ch][(buffer_top_current + i) % SOUND_BUF_SIZE] = (a * v as f64 / 15.0) as i32;
+                            }
                         }
                         drift[ch] = (group_length - remain_length) % SAMPLES_PER_FRAME;
-                        v // emit
-                    } else {
-                        0 // silence
+                        Some((freq, v)) // emit
                     }
-                } else {
-                    0 // silence
-                }
             };
-            if out == 0 {
+            if out.is_none() {
                 for i in 0..remain_length {
-                    buffers_i32[ch][(buffer_pos + drift[ch] + i) % SOUND_BUF_SIZE] = 0;
+                    buffers_i32[ch][(buffer_top_current + i) % SOUND_BUF_SIZE] = 0;
                 }
                 drift[ch] = 0;
             }
+            let (freq, output_level) = out.unwrap_or((0.0, 0));
+            let bar_length = if mute[ch] { 0 } else { output_level as i32 };
             let y = (5 + ch * 2) as i32;
-            bg.1.set_cur_pos(5, y).put_string(&format!("{:7.2}Hz {:3} {:2}", freq[ch], drift[ch], out), None);
-            if !mute[ch] {
-                bg.1.put_code_n('*', out as i32).put_code_n(' ', 15 - out as i32);
-            }
+            bg.1.set_cur_pos(5, y).put_string(&format!("{:7.2}Hz {:3} {:2}", freq, drift[ch], output_level), None);
+            bg.1.put_code_n('*', bar_length).put_code_n(' ', 15 - bar_length);
         }
 
         {
-            let mut idx = buffer_pos;
             for i in 0..SAMPLES_PER_FRAME {
                 let mut integrated = 0;
-                for ch_no in 0..8 {
-                    if !mute[ch_no] {
-                        integrated += buffers_i32[ch_no][idx];
-                    }
+                for ch_no in 0..NUM_OF_AUDIO_CHANNELS {
+                    integrated += buffers_i32[ch_no][buffer_pos];
                 }
                 mixed_buffer[i] = (integrated / 8 + SETUP_U16) as u16;
-                idx = (idx + 1) % SOUND_BUF_SIZE;
+                buffer_pos = (buffer_pos + 1) % SOUND_BUF_SIZE;
             }
-            buffer_pos = idx;
             audio_device_a.set_data(pos, &mixed_buffer);
         }
 
         let (m_pos_spx, m_pos_spy) = (pointer_pos.0 as i32 / PIXEL_SCALE, pointer_pos.1 as i32 / PIXEL_SCALE);
         let (m_pos_bgx, m_pos_bgy) = (m_pos_spx / PATTERN_SIZE as i32, m_pos_spy / PATTERN_SIZE as i32);
-        bg.0.set_cur_pos(0, 0)
-            .put_string(&format!("{:4}", t_count), Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.0.set_cur_pos(0, 1)
-            .put_string(&format!("{:3} {:3}", m_pos_spx, m_pos_spy), Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.0.set_cur_pos(0, 2)
-            .put_string(&format!("{:3} {:3}", m_pos_bgx, m_pos_bgy), Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.0.set_cur_pos(0, 0).put_string(&format!("{:4}", t_count), Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.0.set_cur_pos(0, 1).put_string(&format!("{:3} {:3}", m_pos_spx, m_pos_spy), Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.0.set_cur_pos(0, 2).put_string(&format!("{:3} {:3}", m_pos_bgx, m_pos_bgy), Some(&CharAttributes::new(1, BgSymmetry::Normal)));
         spr.sp[0].pos(Pos::new(m_pos_spx, m_pos_spy)).visible(true);
         if input_role_state.get(InputRole::LeftButton).1 & 0b1111 == 0b0011 {
             bg.1.set_cur_pos(m_pos_bgx, m_pos_bgy);
-            let (c, p) = (bg.1.read_code(), bg.1.read_palette());
-            match (c as u8 as char, p) {
-                ('0', 1) => mute[0] = true,
-                ('0', 5) => mute[0] = false,
-                ('1', 1) => mute[1] = true,
-                ('1', 5) => mute[1] = false,
-                ('2', 1) => mute[2] = true,
-                ('2', 5) => mute[2] = false,
-                ('3', 1) => mute[3] = true,
-                ('3', 5) => mute[3] = false,
-                ('4', 1) => mute[4] = true,
-                ('4', 5) => mute[4] = false,
-                ('5', 1) => mute[5] = true,
-                ('5', 5) => mute[5] = false,
-                ('6', 1) => mute[6] = true,
-                ('6', 5) => mute[6] = false,
-                ('7', 1) => mute[7] = true,
-                ('7', 5) => mute[7] = false,
-                (_, _) => {},
-            }
-            match p {
-                1 => _ = bg.1.put_palette(5),
-                5 => _ = bg.1.put_palette(1),
-                _ => {},
+            let achar = bg.1.read_achar();
+            if ('0'..='7').contains(&(achar.code as u8 as char)) && ((achar.palette == 1) || (achar.palette ==5)) {
+                let ch = achar.code as usize - '0' as usize;
+                mute[ch] = if achar.palette == 1 { true } else { false };
+                bg.1.put_palette(if achar.palette == 1 { 5 } else { 1 });
             }
         }
         if input_role_state.get(InputRole::Up).1 & 0b1111 == 0b0011 {
             if master_volume < 7 {
                 master_volume += 1;
+                audio_device_a.set_volume(master_volume);
             }
         }
         if input_role_state.get(InputRole::Down).1 & 0b1111 == 0b0011 {
             if master_volume > 0 {
                 master_volume -= 1;
+                audio_device_a.set_volume(master_volume);
             }
         }
         if input_role_state.get(InputRole::Start).1 & 0b1111 == 0b0011 {
-            for ch in 0..8 {
-                playing[ch] = !playing[ch];
-                note_pos[ch] = 0;
-            }
+            playing = !playing;
+            note_pos = 0;
         }
 
         if wait_and_update::doing(
