@@ -19,8 +19,8 @@ use audio_lib3::*;
 mod wave_data;
 use wave_data::*;
 
-mod music_data;
-use music_data::MUSIC;
+mod sound_manager;
+use sound_manager::*;
 
 // use once_cell::sync::OnceCell;
 use piston_window::{ControllerButton, ControllerHat, HatState, Key, MouseButton};
@@ -42,7 +42,7 @@ const SOUND_BUF_SIZE: usize = 4096;
 const SAMPLES_PER_FRAME: usize = (SAMPLING_FREQ / 60) as usize;
 const NUM_OF_AUDIO_CHANNELS: usize = 8;
 const BASE_FREQ: f64 = SAMPLING_FREQ as f64 / WAVE_DATA_LENGTH as f64;
-const FREQ_ADJ_RATIO: f64 = 44.0;
+const FREQ_ADJ_RATIO: f64 = 44.1;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -149,6 +149,8 @@ fn main() {
     audio_context.set_samples(Some(256));
     let mut audio_device_a = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
 
+    let mut sound_manager = SoundManager::default();
+
     if game_window.full_screen() {
         sdl_context.mouse().show_cursor(false);
     }
@@ -159,14 +161,15 @@ fn main() {
         let s = "Test for WSG Play".to_string();
         let x = (VM_RECT_SIZE.0 - s.len() as i32) / 2;
         bg.1.set_cur_pos(x,  0).put_string(&s,    Some(&CharAttributes::new(3, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3,  5).put_string(&"0:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3,  7).put_string(&"1:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3,  9).put_string(&"2:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3, 11).put_string(&"3:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3, 13).put_string(&"4:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3, 15).put_string(&"5:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3, 17).put_string(&"6:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3, 19).put_string(&"7:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3,  5).put_string(&"* ", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3,  6).put_string(&"0:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3,  8).put_string(&"1:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3, 10).put_string(&"2:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3, 12).put_string(&"3:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3, 14).put_string(&"4:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3, 16).put_string(&"5:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3, 18).put_string(&"6:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(3, 20).put_string(&"7:", Some(&CharAttributes::new(1, BgSymmetry::Normal)));
     }
     spr.sp[0].code(0).palette(1).symmetry(SpSymmetry::Normal);
 
@@ -177,7 +180,6 @@ fn main() {
     let mut mute = [false; NUM_OF_AUDIO_CHANNELS];
     let mut drift = [0usize; NUM_OF_AUDIO_CHANNELS];
     let mut playing = false;
-    let mut note_pos = 0;
     let mut ch0_buffer_i32 = vec![0; SOUND_BUF_SIZE];
     let mut ch1_buffer_i32 = vec![0; SOUND_BUF_SIZE];
     let mut ch2_buffer_i32 = vec![0; SOUND_BUF_SIZE];
@@ -218,15 +220,9 @@ fn main() {
         bg.1.set_cur_pos(10, 2).put_string(&format!("{:7} {:7} {:5} {:6}", audio_device_current, pos, pos - audio_device_current, offset), None);
         bg.1.set_cur_pos(30, 3).put_string(&format!("Volume:{:1}", master_volume), None);
 
-        let sound_data = if playing {
-            note_pos += 1;
-            if note_pos >= MUSIC.len() {
-                playing = false;
-            }
-            MUSIC[note_pos - 1]
-        } else {
-            [(0usize, 0i32, 0u16);8]
-        };
+        sound_manager.run();
+        let sound_data = sound_manager.get_ch_registers();
+
         for ch in 0..8 {
             let remain_length = SAMPLES_PER_FRAME - drift[ch];
             let buffer_top_current = buffer_pos + drift[ch];
@@ -266,7 +262,7 @@ fn main() {
             }
             let (freq, output_level) = out.unwrap_or((0.0, 0));
             let bar_length = if mute[ch] { 0 } else { output_level as i32 };
-            let y = (5 + ch * 2) as i32;
+            let y = (6 + ch * 2) as i32;
             bg.1.set_cur_pos(5, y).put_string(&format!("{:7.2}Hz {:3} {:2}", freq, drift[ch], output_level), None);
             bg.1.put_code_n('*', bar_length).put_code_n(' ', 15 - bar_length);
         }
@@ -297,7 +293,15 @@ fn main() {
                 mute[ch] = if achar.palette == 1 { true } else { false };
                 bg.1.put_palette(if achar.palette == 1 { 5 } else { 1 });
             }
+            if achar.code as u8 as char == '*' {
+                for ch in 0..8 {
+                    mute[ch] = !mute[ch];
+                    let y = (6 + ch * 2) as i32;
+                    bg.1.set_cur_pos(3, y).put_palette(if mute[ch] { 5 } else { 1 });
+                }
+            }
         }
+
         if input_role_state.get(InputRole::Up).1 & 0b1111 == 0b0011 {
             if master_volume < 7 {
                 master_volume += 1;
@@ -312,7 +316,13 @@ fn main() {
         }
         if input_role_state.get(InputRole::Start).1 & 0b1111 == 0b0011 {
             playing = !playing;
-            note_pos = 0;
+            sound_manager.play_request[0] = 1;
+            sound_manager.play_request[1] = 0;
+        }
+        if input_role_state.get(InputRole::Cancel).1 & 0b1111 == 0b0011 {
+            playing = !playing;
+            sound_manager.play_request[0] = 0;
+            sound_manager.play_request[1] = 1;
         }
 
         if wait_and_update::doing(
