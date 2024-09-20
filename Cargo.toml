@@ -11,3 +11,7 @@ pistoncore-sdl2_window = "0.69"
 
 bgsp-lib2 = { path = "../bgsp-lib2", version = "0.3" }
 audio-lib3 = { path = "../audio-lib3", version = "0.2" }
+
+[features]
+default = []
+develop = []

@@ -1,0 +1,77 @@
+#[derive(PartialEq, PartialOrd, Debug, Clone, Copy)]
+pub enum SoundIdx {
+    FloorStart = 0x00,
+    FloorFinish,
+    FinalFloorFinish,
+    Zapped,
+    IshtarFloor,
+    NormalFloor,
+    DragonFloor,
+    DruagaFloor,
+    Chime,
+    SlimeMove,
+    Spell,
+    Fire,
+    BreakWall,
+    DragonFlame,
+    Sword1,
+    Sword2,
+    Sword3,
+    Sword4,
+    CutMonster,
+    NoUse1,
+    BlockSpell,
+    OpenDoor,
+    GetKey,
+    GetItem,
+    NoUse2,
+    GilWalk,
+    CreditUpPost,
+    Miss,
+    GameOver,
+    NameEntry,
+    Extend,
+    CreditUpPre,
+    _EndOfVariants
+}
+
+pub const NUM_SOUND_IDX: usize = SoundIdx::_EndOfVariants as usize;
+
+impl From<i32> for SoundIdx {
+    fn from(n: i32) -> Self {
+        match n {
+            0x00 => Self::FloorStart,
+            0x01 => Self::FloorFinish,
+            0x02 => Self::FinalFloorFinish,
+            0x03 => Self::Zapped,
+            0x04 => Self::IshtarFloor,
+            0x05 => Self::NormalFloor,
+            0x06 => Self::DragonFloor,
+            0x07 => Self::DruagaFloor,
+            0x08 => Self::Chime,
+            0x09 => Self::SlimeMove,
+            0x0a => Self::Spell,
+            0x0b => Self::Fire,
+            0x0c => Self::BreakWall,
+            0x0d => Self::DragonFlame,
+            0x0e => Self::Sword1,
+            0x0f => Self::Sword2,
+            0x10 => Self::Sword3,
+            0x11 => Self::Sword4,
+            0x12 => Self::CutMonster,
+            0x13 => Self::NoUse1,
+            0x14 => Self::BlockSpell,
+            0x15 => Self::OpenDoor,
+            0x16 => Self::GetKey,
+            0x17 => Self::GetItem,
+            0x18 => Self::NoUse2,
+            0x19 => Self::GilWalk,
+            0x1a => Self::CreditUpPost,
+            0x1b => Self::Miss,
+            0x1c => Self::GameOver,
+            0x1d => Self::NameEntry,
+            0x1e => Self::Extend,
+            _    => Self::CreditUpPre
+        }
+    }
+}

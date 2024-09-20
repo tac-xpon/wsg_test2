@@ -22,7 +22,6 @@ use wave_data::*;
 mod sound_manager;
 use sound_manager::*;
 
-// use once_cell::sync::OnceCell;
 use piston_window::{ControllerButton, ControllerHat, HatState, Key, MouseButton};
 
 const FULL_SCREEN: bool = false;
@@ -176,10 +175,11 @@ fn main() {
     let mut t_count = 0;
     let mut pointer_pos = (0.0, 0.0);
     let mut master_volume = 4;
+    let mut music_select = 0;
+    let mut music_playing = Some(music_select);
     let waveform = [&WAVE_0, &WAVE_1, &WAVE_2, &WAVE_3, &WAVE_4, &WAVE_5, &WAVE_6, &WAVE_7];
     let mut mute = [false; NUM_OF_AUDIO_CHANNELS];
     let mut drift = [0usize; NUM_OF_AUDIO_CHANNELS];
-    let mut playing = false;
     let mut ch0_buffer_i32 = vec![0; SOUND_BUF_SIZE];
     let mut ch1_buffer_i32 = vec![0; SOUND_BUF_SIZE];
     let mut ch2_buffer_i32 = vec![0; SOUND_BUF_SIZE];
@@ -217,11 +217,10 @@ fn main() {
             pos -= SAMPLES_PER_FRAME;
             offset -= SAMPLES_PER_FRAME as i32;
         }
-        bg.1.set_cur_pos(10, 2).put_string(&format!("{:7} {:7} {:5} {:6}", audio_device_current, pos, pos - audio_device_current, offset), None);
-        bg.1.set_cur_pos(30, 3).put_string(&format!("Volume:{:1}", master_volume), None);
 
         sound_manager.run();
         let sound_data = sound_manager.get_ch_registers();
+        sound_manager.clear_ch_registers();
 
         for ch in 0..8 {
             let remain_length = SAMPLES_PER_FRAME - drift[ch];
@@ -302,6 +301,12 @@ fn main() {
             }
         }
 
+        if input_role_state.get(InputRole::Left).1 & 0b1111 == 0b0011 {
+            music_select = if music_select == 0 { 31 } else { music_select -1 };
+        }
+        if input_role_state.get(InputRole::Right).1 & 0b1111 == 0b0011 {
+            music_select = if music_select == 31 { 0 } else { music_select + 1 };
+        }
         if input_role_state.get(InputRole::Up).1 & 0b1111 == 0b0011 {
             if master_volume < 7 {
                 master_volume += 1;
@@ -315,15 +320,54 @@ fn main() {
             }
         }
         if input_role_state.get(InputRole::Start).1 & 0b1111 == 0b0011 {
-            playing = !playing;
-            sound_manager.play_request[0] = 1;
-            sound_manager.play_request[1] = 0;
+            if let Some(music_no) = music_playing {
+                if music_no != music_select {
+                    sound_manager.play_request[music_no] = 0;
+                }
+            }
+            if music_select == 0x1f {
+                sound_manager.play_request[music_select] += 1;
+            } else {
+                sound_manager.play_request[music_select] = 1;
+            }
+            music_playing = Some(music_select);
+        }
+        if input_role_state.get(InputRole::Ok).1 & 0b1111 == 0b0011 {
+            sound_manager.play_request[music_select] = 1;
         }
         if input_role_state.get(InputRole::Cancel).1 & 0b1111 == 0b0011 {
-            playing = !playing;
-            sound_manager.play_request[0] = 0;
-            sound_manager.play_request[1] = 1;
+            for i in 0..0x20 {
+                sound_manager.play_request[i] = 0;
+            }
         }
+        if let Some(music_no) = music_playing {
+            if !sound_manager.play_progress(music_no) && sound_manager.play_request[music_no] == 0 {
+                music_playing = None;
+            }
+        }
+        bg.1.set_cur_pos(4, 22);
+        for i in 0..0x20 {
+            let c = if sound_manager.play_request[i] > 0 { (sound_manager.play_request[i] as u8 + '0' as u8) as char } else { ' ' };
+            bg.1.put_achar(&AChar::new(c, 4, BgSymmetry::Normal));
+        }
+        bg.1.set_cur_pos(4, 23);
+        for i in 0..0x20 {
+            let c = if sound_manager.play_progress(i) { '+' } else { '-' };
+            bg.1.put_achar(&AChar::new(c, 4, BgSymmetry::Normal));
+        }
+        bg.1.set_code_n_at(4, 24, ' ', 0x20);
+        bg.1.set_cur_pos(music_select as i32 + 4, 24);
+        bg.1.put_achar(&AChar::new('^', 3, BgSymmetry::Normal));
+        #[cfg(feature="develop")]
+        {
+            if input_role_state.get(InputRole::Pause).1 & 0b1111 == 0b0011 {
+                println!("{:?}", sound_manager.get_ch_registers());
+                println!("{:?}", sound_manager.play_request);
+            }
+        }
+        bg.1.set_cur_pos(10, 2).put_string(&format!("{:7} {:7} {:5} {:6}", audio_device_current, pos, pos - audio_device_current, offset), None);
+        bg.1.set_cur_pos(30, 3).put_string(&format!("Volume:{:1}", master_volume), None);
+        bg.1.set_cur_pos(20, 3).put_string(&format!("No.{:02X}", music_select), None);
 
         if wait_and_update::doing(
             &mut game_window,
