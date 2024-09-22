@@ -16,8 +16,8 @@ use bgsp_lib2::{bg_plane::*, bgsp_common::*, sp_resources::*};
 
 use audio_lib3::*;
 
-mod wave_data;
-use wave_data::*;
+mod sound_generator;
+use sound_generator::*;
 
 mod sound_manager;
 use sound_manager::*;
@@ -38,13 +38,10 @@ const BG1_RECT_SIZE: (i32, i32) = (160, 160);
 const MAX_SPRITES: usize = 512;
 
 const SAMPLING_FREQ: i32 = 48000;
+const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
 const SOUND_BUF_SIZE: usize = 4096;
-const SAMPLES_PER_FRAME: usize = (SAMPLING_FREQ / 60) as usize;
 const NUM_OF_AUDIO_CHANNELS: usize = 8;
-const BASE_FREQ: f64 = SAMPLING_FREQ as f64 / WAVE_DATA_LENGTH as f64;
 const FREQ_ADJ_RATIO: f64 = 44.1;
-const GAIN_UP_TRANSITION: f64 = 0.1;
-const GAIN_DOWN_TRANSITION: f64 = 0.1;
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -184,35 +181,11 @@ fn main() {
     let mut music_select = 0;
     let mut music_playing = None;
     let mut play_step = 1;
-    let waveforms = [&WAVE_0, &WAVE_1, &WAVE_2, &WAVE_3, &WAVE_4, &WAVE_5, &WAVE_6, &WAVE_7];
-    let mut mute = [false; NUM_OF_AUDIO_CHANNELS];
-    let mut drift = [0usize; NUM_OF_AUDIO_CHANNELS];
-    let mut current_gain = [0.0; NUM_OF_AUDIO_CHANNELS];
-    let mut ch0_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch1_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch2_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch3_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch4_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch5_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch6_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let mut ch7_buffer_i32 = vec![0; SOUND_BUF_SIZE];
-    let buffers_i32 = [
-        &mut ch0_buffer_i32,
-        &mut ch1_buffer_i32,
-        &mut ch2_buffer_i32,
-        &mut ch3_buffer_i32,
-        &mut ch4_buffer_i32,
-        &mut ch5_buffer_i32,
-        &mut ch6_buffer_i32,
-        &mut ch7_buffer_i32,
-    ];
-    let mut mixed_buffer: SoundData16 = vec![SETUP_U16 as u16; SAMPLES_PER_FRAME];
-
+    let mut sound_generator = SoundGenerator::new(SAMPLING_FREQ, Some(SOUND_BUF_SIZE), Some(FREQ_ADJ_RATIO));
     audio_device_a.set_volume(master_volume);
     audio_device_a.resume();
 
     input_role_state.clear_all();
-    let mut buffer_pos = 0;
     let mut offset = 0;
     'main_loop: loop {
         let mut pos = (t_count * SAMPLES_PER_FRAME as i32 + offset) as usize;
@@ -233,67 +206,8 @@ fn main() {
         if t_count % play_step == play_step - 1 {
             sound_manager.clear_ch_registers();
         }
-
-        for ch in 0..NUM_OF_AUDIO_CHANNELS {
-            let remain_length = SAMPLES_PER_FRAME - drift[ch];
-            let buffer_top_current = buffer_pos + drift[ch];
-            let silence = {
-                let (w, f, g) = sound_data[ch];
-                let freq = f as f64 / FREQ_ADJ_RATIO;
-                if g == 0 && current_gain[ch] <= 0.0 || freq <= 30.0 || w >= NUM_OF_WAVE_FORMS {
-                    true // silence
-                } else {
-                    let specified_gain = if mute[ch]  { 0.0 } else { g as f64};
-                    let wave_length = SAMPLING_FREQ as f64 / freq;
-                    let c = (remain_length as f64 / wave_length).ceil() as usize;
-                    let group_length = (wave_length * c as f64).round_ties_even() as usize;
-                    {
-                        let f_ratio = BASE_FREQ / freq;
-                        for i in 0..group_length {
-                            if specified_gain != current_gain[ch] {
-                                if specified_gain > current_gain[ch] {
-                                    current_gain[ch] += GAIN_UP_TRANSITION;
-                                    if current_gain[ch] > specified_gain {
-                                        current_gain[ch] = specified_gain;
-                                    }
-                                } else {
-                                    current_gain[ch] -= GAIN_DOWN_TRANSITION;
-                                    if current_gain[ch] < specified_gain {
-                                        current_gain[ch] = specified_gain;
-                                    }
-                                }
-                            }
-                            let src_pos = i as f64 / f_ratio;
-                            let src_pos_floor = src_pos as usize;
-                            let sample_0 = waveforms[w][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
-                            let sample_1 = waveforms[w][(src_pos_floor + 1) % WAVE_DATA_LENGTH] as f64;
-                            let a = sample_0 + (sample_1 - sample_0) * (src_pos - src_pos_floor as f64);
-                            buffers_i32[ch][(buffer_top_current + i) % SOUND_BUF_SIZE] = (a * current_gain[ch] / 15.0) as i32;
-                        }
-                    }
-                    drift[ch] = (group_length - remain_length) % SAMPLES_PER_FRAME;
-                    false // sound
-                }
-            };
-            if silence {
-                for i in 0..remain_length {
-                    buffers_i32[ch][(buffer_top_current + i) % SOUND_BUF_SIZE] = 0;
-                }
-                drift[ch] = 0;
-            }
-        }
-
-        {
-            for i in 0..SAMPLES_PER_FRAME {
-                let mut integrated = 0;
-                for ch_no in 0..NUM_OF_AUDIO_CHANNELS {
-                    integrated += buffers_i32[ch_no][buffer_pos];
-                }
-                mixed_buffer[i] = (integrated / NUM_OF_AUDIO_CHANNELS as i32 + SETUP_U16) as u16;
-                buffer_pos = (buffer_pos + 1) % SOUND_BUF_SIZE;
-            }
-            audio_device_a.set_data(pos, &mixed_buffer);
-        }
+        sound_generator.generate(&sound_data);
+        audio_device_a.set_data(pos, sound_generator.mixed_buffer());
 
         let (m_pos_spx, m_pos_spy) = (pointer_pos.0 as i32 / PIXEL_SCALE, pointer_pos.1 as i32 / PIXEL_SCALE);
         let (m_pos_bgx, m_pos_bgy) = (m_pos_spx / PATTERN_SIZE as i32, m_pos_spy / PATTERN_SIZE as i32);
@@ -309,11 +223,11 @@ fn main() {
             if achar.palette == 4 || achar.palette == 5 {
                 if ('0' as u32..='7' as u32).contains(&achar.code) {
                     let ch = achar.code as usize - '0' as usize;
-                    mute[ch] = !mute[ch];
+                    sound_generator.mute[ch] = !sound_generator.mute[ch];
                 }
                 if achar.code == '*' as u32 {
                     for ch in 0..8 {
-                        mute[ch] = !mute[ch];
+                        sound_generator.mute[ch] = !sound_generator.mute[ch];
                     }
                 }
                 if achar.code == '_' as u32 || achar.code == '|' as u32 {
@@ -395,9 +309,9 @@ fn main() {
         for ch in 0..NUM_OF_AUDIO_CHANNELS {
             let (w, f, g) = sound_data[ch];
             let freq = f as f64 / FREQ_ADJ_RATIO;
-            let gain = if mute[ch] || freq <= 30.0 { 0 } else { g as i32 };
+            let gain = if sound_generator.mute[ch] || freq <= 30.0 { 0 } else { g as i32 };
             let y = (6 + ch * 2) as i32;
-            bg.1.set_palette_at(3, y, if mute[ch] { 5 } else { 4 });
+            bg.1.set_palette_at(3, y, if sound_generator.mute[ch] { 5 } else { 4 });
             bg.1.set_cur_pos( 5, y).put_string(&format!("{:7.2}Hz {:1} {:2} ", freq, w, gain), None);
             bg.1.set_cur_pos(20, y).put_code_n('>', gain).put_code_n(' ', 15 - gain);
         }

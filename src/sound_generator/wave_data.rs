@@ -1,9 +1,9 @@
-use audio_lib3::SETUP_U16;
-
 pub const WAVE_DATA_LENGTH: usize = 32;
 pub const NUM_OF_WAVE_FORMS: usize = 8;
 
-pub const WAVE_0: [i32; WAVE_DATA_LENGTH] = {
+pub const SETUP_U16: i32 = 0x8000;
+
+const WAVE_0: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x00, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e,
         0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e, 0x0e,
@@ -19,7 +19,7 @@ pub const WAVE_0: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_1: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_1: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x0d, 0x06, 0x09, 0x01, 0x06, 0x05, 0x0f, 0x0c,
         0x0a, 0x0c, 0x04, 0x04, 0x02, 0x0b, 0x08, 0x0e,
@@ -35,7 +35,7 @@ pub const WAVE_1: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_2: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_2: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x07, 0x0a, 0x0c, 0x0c, 0x0e, 0x0e, 0x0c, 0x0c,
         0x0e, 0x0e, 0x0c, 0x09, 0x07, 0x07, 0x05, 0x05,
@@ -51,7 +51,7 @@ pub const WAVE_2: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_3: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_3: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x0a, 0x0c, 0x0e, 0x0e, 0x0c, 0x0b, 0x0a, 0x09,
         0x0a, 0x0b, 0x0b, 0x03, 0x03, 0x04, 0x05, 0x05,
@@ -67,7 +67,7 @@ pub const WAVE_3: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_4: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_4: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x07, 0x0a, 0x0c, 0x0d, 0x0e, 0x0d, 0x0c, 0x0a,
         0x07, 0x04, 0x02, 0x01, 0x00, 0x01, 0x02, 0x04,
@@ -83,7 +83,7 @@ pub const WAVE_4: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_5: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_5: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x0a, 0x0c, 0x0c, 0x0a, 0x07, 0x07, 0x08, 0x0b,
         0x0d, 0x0e, 0x0d, 0x0a, 0x06, 0x05, 0x05, 0x07,
@@ -99,7 +99,7 @@ pub const WAVE_5: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_6: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_6: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0d, 0x0e, 0x0e,
         0x0e, 0x0d, 0x0d, 0x0c, 0x0b, 0x0a, 0x09, 0x07,
@@ -115,7 +115,7 @@ pub const WAVE_6: [i32; WAVE_DATA_LENGTH] = {
     wave
 };
 
-pub const WAVE_7: [i32; WAVE_DATA_LENGTH] = {
+const WAVE_7: [i32; WAVE_DATA_LENGTH] = {
     const SAMPLES: [u8; WAVE_DATA_LENGTH] = [
         0x0f, 0x0f, 0x0e, 0x00, 0x01, 0x01, 0x00, 0x00,
         0x0c, 0x0c, 0x0b, 0x00, 0x01, 0x01, 0x00, 0x00,
@@ -130,3 +130,14 @@ pub const WAVE_7: [i32; WAVE_DATA_LENGTH] = {
     }
     wave
 };
+
+pub const WAVE_FORMS: [&[i32]; NUM_OF_WAVE_FORMS] = [
+    &WAVE_0,
+    &WAVE_1,
+    &WAVE_2,
+    &WAVE_3,
+    &WAVE_4,
+    &WAVE_5,
+    &WAVE_6,
+    &WAVE_7,
+];
