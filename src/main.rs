@@ -160,14 +160,16 @@ fn main() {
         let s = "Test for WSG Play".to_string();
         let x = (VM_RECT_SIZE.0 - s.len() as i32) / 2;
         bg.1.set_cur_pos(x,  0).put_string(&s,    Some(&CharAttributes::new(3, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3,  5).put_achar(&AChar::new('*', 4, BgSymmetry::Normal));
+        bg.1.set_cur_pos(3,  4).put_achar(&AChar::new(0x80 as u32, 4, BgSymmetry::Normal));
         for i in 0..8 {
             let y = 6 + i as i32 * 2;
             let achar = AChar::new('0' as u32 + i, 4, BgSymmetry::Normal);
             bg.1.set_cur_pos( 3, y).put_achar(&achar).put_achar(&AChar::new(':', 1, BgSymmetry::Normal));
             bg.1.set_cur_pos(16, y).put_palette_n(3, 18).put_palette(2);
         }
-        bg.1.set_cur_pos(18, 3).put_string(&"Play Speed", None);
+        bg.1.set_cur_pos(8, 3).put_string(&"LastFrame", None);
+        bg.1.set_achar_at(12, 4, &AChar::new(0x7fu32, 4, BgSymmetry::Normal));
+        bg.1.set_cur_pos(18, 3).put_string(&"PlaySpeed", None);
         bg.1.set_achar_at(20, 4, &AChar::new('-', 4, BgSymmetry::Normal));
         bg.1.set_achar_at(25, 4, &AChar::new('+', 4, BgSymmetry::Normal));
         bg.1.set_cur_pos(30, 3).put_string(&"Sound:", None);
@@ -181,6 +183,7 @@ fn main() {
     let mut music_select = 0;
     let mut music_playing = None;
     let mut play_step = 1;
+    let mut suppress_last = false;
     let mut sound_generator = SoundGenerator::new(SAMPLING_FREQ, Some(SOUND_BUF_SIZE), Some(FREQ_ADJ_RATIO));
     audio_device_a.set_volume(master_volume);
     audio_device_a.resume();
@@ -225,7 +228,7 @@ fn main() {
                     let ch = achar.code as usize - '0' as usize;
                     sound_generator.mute[ch] = !sound_generator.mute[ch];
                 }
-                if achar.code == '*' as u32 {
+                if achar.code == 0x80 as u32 {
                     for ch in 0..8 {
                         sound_generator.mute[ch] = !sound_generator.mute[ch];
                     }
@@ -245,6 +248,10 @@ fn main() {
                     if play_step < 4 {
                         play_step += 1;
                     }
+                }
+                if achar.code == 0x7f {
+                    suppress_last = !suppress_last;
+                    sound_manager.suppress_last_silence = suppress_last;
                 }
             }
         }
@@ -313,7 +320,7 @@ fn main() {
             let y = (6 + ch * 2) as i32;
             bg.1.set_palette_at(3, y, if sound_generator.mute[ch] { 5 } else { 4 });
             bg.1.set_cur_pos( 5, y).put_string(&format!("{:7.2}Hz {:1} {:2} ", freq, w, gain), None);
-            bg.1.set_cur_pos(20, y).put_code_n('>', gain).put_code_n(' ', 15 - gain);
+            bg.1.set_cur_pos(20, y).put_code_n(0x7f as u32, gain).put_code_n(' ', 15 - gain);
         }
         bg.1.set_cur_pos(4, 22);
         for music_no in 0..0x20 {
@@ -349,6 +356,8 @@ fn main() {
             _ => 0,
         };
         bg.1.set_cur_pos(21, 4).put_string(&format!("{:3}%", speed), None);
+        let p = if suppress_last { 5 } else { 4 };
+        bg.1.set_palette_at(12, 4, p);
 
         if wait_and_update::doing(
             &mut game_window,

@@ -11,6 +11,7 @@ struct GeneratorUnit {
     current_gain: f64,
 }
 
+#[allow(dead_code)]
 impl GeneratorUnit {
     fn new(buffer_size: usize) -> Self {
         Self {
@@ -18,6 +19,14 @@ impl GeneratorUnit {
             drift: 0,
             current_gain: 0.0,
         }
+    }
+
+    fn clear(&mut self) {
+        for d in self.buffer.iter_mut() {
+            *d = 0;
+        }
+        self.drift = 0;
+        self.current_gain = 0.0;
     }
 }
 
@@ -33,6 +42,7 @@ pub struct SoundGenerator {
     mixed_buffer: Vec<u16>,
 }
 
+#[allow(dead_code)]
 impl SoundGenerator {
     pub fn new(sampling_freq: i32, op_buffer_size: Option<usize>, op_freq_adj_ratio: Option<f64>) -> Self {
         const DEFAULT_BUFFER_SIZE: usize = 4096;
@@ -61,6 +71,43 @@ impl SoundGenerator {
             buffer_pos: 0,
             mixed_buffer: vec![SETUP_U16 as u16; samples_per_frame],
         }
+    }
+
+    pub fn clear(&mut self) {
+        for unit in self.generators.iter_mut() {
+            unit.clear();
+        }
+        for m in self.mute.iter_mut() {
+            *m = false;
+        }
+        self.buffer_pos = 0;
+        for d in self.mixed_buffer.iter_mut() {
+            *d = SETUP_U16 as u16;
+        }
+    }
+
+    pub fn sampling_freq(&self) -> i32 {
+        self.sampling_freq
+    }
+
+    pub fn buffer_size(&self) -> usize {
+        self.buffer_size
+    }
+
+    pub fn samples_per_frame(&self) -> usize {
+        self.samples_per_frame
+    }
+
+    pub fn base_freq(&self) -> f64 {
+        self.base_freq
+    }
+
+    pub fn buffer_pos(&self) -> usize {
+        self.buffer_pos
+    }
+
+    pub fn mixed_buffer(&self) -> &[u16] {
+        &self.mixed_buffer
     }
 
     pub fn generate(&mut self, sound_data: &[(usize, i32, u16); NUM_OF_GENARTORS]) {
@@ -120,9 +167,5 @@ impl SoundGenerator {
             self.mixed_buffer[i] = (integrated / NUM_OF_GENARTORS as i32 + SETUP_U16) as u16;
             self.buffer_pos = (self.buffer_pos + 1) % self.buffer_size;
         }
-    }
-
-    pub fn mixed_buffer(&self) -> &Vec<u16> {
-        &self.mixed_buffer
     }
 }

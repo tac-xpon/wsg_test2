@@ -58,7 +58,6 @@ impl<'a> ChPrepare<'a> {
 type PlayRequest = [i32; NUM_SOUND_IDX];
 type PlayProgress = [bool; NUM_SOUND_IDX];
 #[derive(Default, Debug)]
-#[allow(dead_code)]
 pub struct SoundManager<'a> {
     pub play_request: PlayRequest,
     play_progress: PlayProgress,
@@ -75,10 +74,57 @@ pub struct SoundManager<'a> {
     group_033a: [ChPrepare<'a>; 4],
     group_0376: [ChPrepare<'a>; 3],
     registers: SoundRegisters,
+    pub suppress_last_silence: bool,
 }
 
 #[allow(dead_code)]
 impl<'a> SoundManager<'a> {
+    pub fn clear(&mut self) {
+        for request in self.play_request.iter_mut() {
+            *request = 0;
+        }
+        for progress in self.play_progress.iter_mut() {
+            *progress = false;
+        }
+        for ch_prepare in self.group_0100.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_0169.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_0187.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_01c3.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_01ff.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_023b.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_0277.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_0295.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_02b3.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_02c2.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_033a.iter_mut() {
+            ch_prepare.clear();
+        }
+        for ch_prepare in self.group_0376.iter_mut() {
+            ch_prepare.clear();
+        }
+        self.clear_ch_registers();
+    }
+
     pub fn get_ch_registers(&self) -> [(usize, i32, u16); 8] {
         [
             self.registers[0].get_registers(),
@@ -108,7 +154,7 @@ impl<'a> SoundManager<'a> {
     }
 
     pub fn run(&mut self) {
-        fn prepare<'a>(idx: usize, request: &mut PlayRequest, progress: &mut PlayProgress, score: &'a[&[(&[u8], &ScaleSet)]], group: &mut[ChPrepare<'a>], registers: &mut[ChRegisters], start_ch: usize) {
+        fn prepare<'a>(idx: usize, request: &mut PlayRequest, progress: &mut PlayProgress, score: &'a[&[(&[u8], &ScaleSet)]], group: &mut[ChPrepare<'a>], registers: &mut[ChRegisters], start_ch: usize, suppress_last_silence: bool) {
             let mut finishd = false;
             for (part_no, ch_score) in score[idx].iter().enumerate() {
                 if finishd {
@@ -250,7 +296,7 @@ impl<'a> SoundManager<'a> {
                 if group[part_no].remain_frames == 0 {
                     group[part_no].read_adr = &group[part_no].read_adr[2..];
                     // 独自実装：末尾の無音１フレームを出力しない
-                    if !finishd {
+                    if suppress_last_silence && !finishd {
                         if group[part_no].read_adr[0] == 0xf3 {
                             if idx == SoundIdx::CreditUpPre as usize {
                                 if request[idx] > 0 {
@@ -280,7 +326,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -290,7 +336,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -300,7 +346,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -310,7 +356,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -320,7 +366,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_0100;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -330,7 +376,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_0100;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -340,7 +386,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_0100;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -350,7 +396,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_0100;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -360,7 +406,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_01ff;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -371,11 +417,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_0169;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -384,7 +430,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 4;
             let group = &mut self.group_0295;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -395,11 +441,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_0277;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -409,11 +455,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_0187;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -422,7 +468,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 3;
             let group = &mut self.group_0376;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -433,11 +479,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -447,11 +493,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -460,7 +506,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 5;
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -471,11 +517,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -485,11 +531,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -499,11 +545,11 @@ impl<'a> SoundManager<'a> {
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
                 self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 self.play_request[IDX] = 0;
             } else {
                 if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
                 }
             }
         }
@@ -512,7 +558,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 5;
             let group = &mut self.group_01c3;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -522,7 +568,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_01ff;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -532,7 +578,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_01ff;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -542,7 +588,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_01ff;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -552,7 +598,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_0100;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -562,7 +608,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 7;
             let group = &mut self.group_02b3;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -572,7 +618,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 4;
             let group = &mut self.group_033a;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -582,7 +628,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -592,7 +638,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -602,7 +648,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 0;
             let group = &mut self.group_02c2;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -612,7 +658,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 4;
             let group = &mut self.group_033a;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
@@ -622,7 +668,7 @@ impl<'a> SoundManager<'a> {
             const START_CH: usize = 4;
             let group = &mut self.group_023b;
             if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH);
+                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
             } else {
                 self.play_progress[IDX] = false;
             }
