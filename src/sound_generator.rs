@@ -156,6 +156,7 @@ impl SoundGenerator {
                 for i in 0..remain_length {
                     unit.buffer[(buffer_top_current + i) % self.buffer_size] = 0;
                 }
+                unit.current_gain = 0.0;
                 unit.drift = 0;
             }
         }

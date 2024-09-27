@@ -205,7 +205,7 @@ fn main() {
         if t_count % play_step == 0 {
             sound_manager.run();
         }
-            let sound_data = sound_manager.get_ch_registers();
+        let sound_data = sound_manager.get_ch_registers();
         if t_count % play_step == play_step - 1 {
             sound_manager.clear_ch_registers();
         }
