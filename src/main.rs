@@ -33,9 +33,9 @@ const VM_RECT_PIXEL_SIZE: (i32, i32) = (
 const ROTATION: Direction = Direction::Up;
 const PIXEL_SCALE: i32 = 2;
 const WINDOW_MARGIN: i32 = 2;
-const BG0_RECT_SIZE: (i32, i32) = (100, 60);
-const BG1_RECT_SIZE: (i32, i32) = (160, 160);
-const MAX_SPRITES: usize = 512;
+const BG0_RECT_SIZE: (i32, i32) = (40, 30);
+const BG1_RECT_SIZE: (i32, i32) = (40, 30);
+const MAX_SPRITES: usize = 128;
 
 const SAMPLING_FREQ: i32 = 48000;
 const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
@@ -148,8 +148,6 @@ fn main() {
     audio_context.set_samples(Some(256));
     let mut audio_device_a = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
 
-    let mut sound_manager = SoundManager::default();
-
     if game_window.full_screen() {
         sdl_context.mouse().show_cursor(false);
     }
@@ -184,7 +182,11 @@ fn main() {
     let mut music_playing = None;
     let mut play_step = 1;
     let mut suppress_last = false;
+
+    let mut sound_manager = SoundManager::default();
+    sound_manager.suppress_last_silence = suppress_last;
     let mut sound_generator = SoundGenerator::new(SAMPLING_FREQ, Some(SOUND_BUF_SIZE), Some(FREQ_ADJ_RATIO));
+
     audio_device_a.set_volume(master_volume);
     audio_device_a.resume();
 
