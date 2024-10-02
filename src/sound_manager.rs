@@ -37,9 +37,9 @@ struct ChPrepare<'a> {
     envelope: usize,
     envelope_read_pos: usize,
     work_c: usize,
-    work_d: usize,
-    work_e: usize,
-    work_f: usize,
+    // work_d: usize,
+    // work_e: usize,
+    // work_f: usize,
 }
 
 impl<'a> ChPrepare<'a> {
@@ -49,9 +49,9 @@ impl<'a> ChPrepare<'a> {
         self.unit_frames = 0;
         self.envelope_read_pos = 0;
         self.work_c = 0;
-        self.work_d = 0;
-        self.work_e = 0;
-        self.work_f = 0;
+        // self.work_d = 0;
+        // self.work_e = 0;
+        // self.work_f = 0;
     }
 }
 
@@ -321,356 +321,82 @@ impl<'a> SoundManager<'a> {
             }
         }
 
-        {
-            const IDX: usize = SoundIdx::FloorStart as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
+        enum SoundType {
+            OneShot,
+            Retriggerable,
         }
-        {
-            const IDX: usize = SoundIdx::FloorFinish as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
+
+        enum Group {
+            G0100, G0169, G0187, G01c3, G01ff, G023b,
+            G0277, G0295, G02b3, G02c2, G033a, G0376,
         }
-        {
-            const IDX: usize = SoundIdx::FinalFloorFinish as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Zapped as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::IshtarFloor as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_0100;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::NormalFloor as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_0100;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::DragonFloor as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_0100;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::DruagaFloor as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_0100;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Chime as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_01ff;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::SlimeMove as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_0169;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
+
+        const SOUND_INFO: [(SoundType, Group, usize); SoundIdx::_EndOfVariants as usize] = [
+            (SoundType::OneShot      , Group::G02c2, 0), // FloorStart
+            (SoundType::OneShot      , Group::G02c2, 0), // FloorFinish
+            (SoundType::OneShot      , Group::G02c2, 0), // FinalFloorFinish
+            (SoundType::OneShot      , Group::G02c2, 0), // Zapped
+            (SoundType::OneShot      , Group::G0100, 0), // IshtarFloor
+            (SoundType::OneShot      , Group::G0100, 0), // NormalFloor
+            (SoundType::OneShot      , Group::G0100, 0), // DragonFloor
+            (SoundType::OneShot      , Group::G0100, 0), // DruagaFloor
+            (SoundType::OneShot      , Group::G01ff, 0), // Chime
+            (SoundType::Retriggerable, Group::G0169, 4), // SlimeMove
+            (SoundType::OneShot      , Group::G0295, 4), // Spell
+            (SoundType::Retriggerable, Group::G0277, 4), // Fire
+            (SoundType::Retriggerable, Group::G0187, 3), // BreakWall
+            (SoundType::OneShot      , Group::G0376, 3), // DragonFlame
+            (SoundType::Retriggerable, Group::G01c3, 5), // Sword1
+            (SoundType::Retriggerable, Group::G01c3, 5), // Sword2
+            (SoundType::OneShot      , Group::G01c3, 5), // Sword3
+            (SoundType::Retriggerable, Group::G01c3, 5), // Sword4
+            (SoundType::Retriggerable, Group::G01c3, 4), // CutMonster
+            (SoundType::Retriggerable, Group::G01c3, 5), // NoUse1
+            (SoundType::OneShot      , Group::G01c3, 5), // BlockSpell
+            (SoundType::OneShot      , Group::G01ff, 0), // OpenDoor
+            (SoundType::OneShot      , Group::G01ff, 0), // GetKey
+            (SoundType::OneShot      , Group::G01ff, 0), // GetItem
+            (SoundType::OneShot      , Group::G0100, 0), // NoUse2
+            (SoundType::OneShot      , Group::G02b3, 7), // GilWalk
+            (SoundType::OneShot      , Group::G033a, 4), // CreditUpPost
+            (SoundType::OneShot      , Group::G02c2, 0), // Miss
+            (SoundType::OneShot      , Group::G02c2, 0), // GameOver
+            (SoundType::OneShot      , Group::G02c2, 0), // NameEntry
+            (SoundType::OneShot      , Group::G033a, 4), // Extend
+            (SoundType::OneShot      , Group::G023b, 4), // CreditUpPre
+        ];
+
+        for (idx, info) in SOUND_INFO.iter().enumerate() {
+            let start_ch = info.2;
+            let group = match info.1 {
+                Group::G0100 => &mut self.group_0100[0..],
+                Group::G0169 => &mut self.group_0169[0..],
+                Group::G0187 => &mut self.group_0187[0..],
+                Group::G01c3 => &mut self.group_01c3[0..],
+                Group::G01ff => &mut self.group_01ff[0..],
+                Group::G023b => &mut self.group_023b[0..],
+                Group::G0277 => &mut self.group_0277[0..],
+                Group::G0295 => &mut self.group_0295[0..],
+                Group::G02b3 => &mut self.group_02b3[0..],
+                Group::G02c2 => &mut self.group_02c2[0..],
+                Group::G033a => &mut self.group_033a[0..],
+                Group::G0376 => &mut self.group_0376[0..],
+            };
+            match info.0 {
+                SoundType::OneShot => if self.play_request[idx] != 0 {
+                    prepare(idx, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, start_ch, self.suppress_last_silence);
+                } else {
+                    self.play_progress[idx] = false
                 }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Spell as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_0295;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Fire as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_0277;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
+                SoundType::Retriggerable => if self.play_request[idx] != 0 {
+                    self.play_progress[idx] = false;
+                    prepare(idx, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, start_ch, self.suppress_last_silence);
+                    self.play_request[idx] = 0;
+                } else {
+                    if self.play_progress[idx] {
+                        prepare(idx, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, start_ch, self.suppress_last_silence);
+                    }
                 }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::BreakWall as usize;
-            const START_CH: usize = 3;
-            let group = &mut self.group_0187;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::DragonFlame as usize;
-            const START_CH: usize = 3;
-            let group = &mut self.group_0376;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Sword1 as usize;
-            const START_CH: usize = 5;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Sword2 as usize;
-            const START_CH: usize = 5;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Sword3 as usize;
-            const START_CH: usize = 5;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Sword4 as usize;
-            const START_CH: usize = 5;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::CutMonster as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::NoUse1 as usize;
-            const START_CH: usize = 5;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                self.play_progress[IDX] = false;
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                self.play_request[IDX] = 0;
-            } else {
-                if self.play_progress[IDX] {
-                    prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-                }
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::BlockSpell as usize;
-            const START_CH: usize = 5;
-            let group = &mut self.group_01c3;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::OpenDoor as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_01ff;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::GetKey as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_01ff;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::GetItem as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_01ff;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::NoUse2 as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_0100;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::GilWalk as usize;
-            const START_CH: usize = 7;
-            let group = &mut self.group_02b3;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::CreditUpPost as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_033a;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Miss as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::GameOver as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::NameEntry as usize;
-            const START_CH: usize = 0;
-            let group = &mut self.group_02c2;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::Extend as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_033a;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
-            }
-        }
-        {
-            const IDX: usize = SoundIdx::CreditUpPre as usize;
-            const START_CH: usize = 4;
-            let group = &mut self.group_023b;
-            if self.play_request[IDX] != 0 {
-                prepare(IDX, &mut self.play_request, &mut self.play_progress, MUSIC_SCORES, group, &mut self.registers, START_CH, self.suppress_last_silence);
-            } else {
-                self.play_progress[IDX] = false;
             }
         }
     }

@@ -2371,7 +2371,7 @@ dependencies = [
 
 [[package]]
 name = "wsg_test"
-version = "0.6.2"
+version = "0.6.3"
 dependencies = [
  "audio-lib3",
  "bgsp-lib2",
