@@ -46,7 +46,7 @@ pub struct SoundGenerator {
 impl SoundGenerator {
     pub fn new(sampling_freq: i32, op_buffer_size: Option<usize>, op_freq_adj_ratio: Option<f64>) -> Self {
         const DEFAULT_BUFFER_SIZE: usize = 4096;
-        const DEFAULT_FREQ_ADJ_RATIO: f64 = 44.1;
+        const DEFAULT_FREQ_ADJ_RATIO: f64 = 43.69; // 0x10000(=65536) -> 1500Hz
         let buffer_size = op_buffer_size.unwrap_or(DEFAULT_BUFFER_SIZE);
         let freq_adj_ratio = op_freq_adj_ratio.unwrap_or(DEFAULT_FREQ_ADJ_RATIO);
         let samples_per_frame = (sampling_freq / 60) as usize;
@@ -142,9 +142,10 @@ impl SoundGenerator {
                             }
                             let src_pos = i as f64 / f_ratio;
                             let src_pos_floor = src_pos as usize;
-                            let sample_0 = WAVE_FORMS[w][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
-                            let sample_1 = WAVE_FORMS[w][(src_pos_floor + 1) % WAVE_DATA_LENGTH] as f64;
-                            let a = sample_0 + (sample_1 - sample_0) * (src_pos - src_pos_floor as f64);
+                            let a = WAVE_FORMS[w][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
+                            // let sample_0 = WAVE_FORMS[w][(src_pos_floor + 0) % WAVE_DATA_LENGTH] as f64;
+                            // let sample_1 = WAVE_FORMS[w][(src_pos_floor + 1) % WAVE_DATA_LENGTH] as f64;
+                            // let a = sample_0 + (sample_1 - sample_0) * (src_pos - src_pos_floor as f64);
                             unit.buffer[(buffer_top_current + i) % self.buffer_size] = (a * unit.current_gain / 15.0) as i32;
                         }
                     }

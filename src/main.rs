@@ -41,7 +41,7 @@ const SAMPLING_FREQ: i32 = 48000;
 const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
 const SOUND_BUF_SIZE: usize = 4096;
 const NUM_OF_AUDIO_CHANNELS: usize = 8;
-const FREQ_ADJ_RATIO: f64 = 44.0;
+const FREQ_ADJ_RATIO: f64 = 43.69; // 0x10000(=65536) -> 1500Hz
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
