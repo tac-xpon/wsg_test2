@@ -38,8 +38,9 @@ const BG1_RECT_SIZE: (i32, i32) = (40, 30);
 const MAX_SPRITES: usize = 128;
 
 const SAMPLING_FREQ: i32 = 48000;
-const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
-const SOUND_BUF_SIZE: usize = 4096;
+// const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
+const SOUND_BUF_SIZE: usize = 8192;
+const NUM_BUFFERING_FRAME: usize = 3;
 const NUM_OF_AUDIO_CHANNELS: usize = 8;
 const FREQ_ADJ_RATIO: f64 = 43.69; // 0x10000(=65536) -> 1500Hz
 
@@ -191,19 +192,8 @@ fn main() {
     audio_device_a.resume();
 
     input_role_state.clear_all();
-    let mut offset = 0;
+    audio_device_a.set_silent_data();
     'main_loop: loop {
-        let mut pos = (t_count * SAMPLES_PER_FRAME as i32 + offset) as usize;
-        let audio_device_current = audio_device_a.current();
-        while audio_device_current > pos {
-            pos += SAMPLES_PER_FRAME;
-            offset += SAMPLES_PER_FRAME as i32;
-        }
-        while pos - audio_device_current > SAMPLES_PER_FRAME * 4 {
-            pos -= SAMPLES_PER_FRAME;
-            offset -= SAMPLES_PER_FRAME as i32;
-        }
-
         if t_count % play_step == 0 {
             sound_manager.run();
         }
@@ -211,8 +201,10 @@ fn main() {
         if t_count % play_step == play_step - 1 {
             sound_manager.clear_ch_registers();
         }
-        sound_generator.generate(&sound_data);
-        audio_device_a.set_data(pos, sound_generator.mixed_buffer());
+        while audio_device_a.remain() < sound_generator.samples_per_frame() * NUM_BUFFERING_FRAME {
+            sound_generator.generate(&sound_data);
+            audio_device_a.push_data(sound_generator.mixed_buffer());
+        }
 
         let (m_pos_spx, m_pos_spy) = (pointer_pos.0 as i32 / PIXEL_SCALE, pointer_pos.1 as i32 / PIXEL_SCALE);
         let (m_pos_bgx, m_pos_bgy) = (m_pos_spx / PATTERN_SIZE as i32, m_pos_spy / PATTERN_SIZE as i32);
@@ -347,7 +339,7 @@ fn main() {
                 println!("{:?}", sound_manager.play_request);
             }
         }
-        bg.1.set_cur_pos( 8, 2).put_string(&format!("{:9} {:9} {:4} {:5}", audio_device_current, pos, pos - audio_device_current, offset), Some(&CharAttributes::new(2, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(24, 2).put_string(&format!("{:9} {:6}", audio_device_a.current(), audio_device_a.remain()), Some(&CharAttributes::new(2, BgSymmetry::Normal)));
         bg.1.set_cur_pos(36, 3).put_string(&format!("{:02X}", music_select), None);
         bg.1.set_cur_pos(37, 4).put_string(&format!("{:1}", master_volume), None);
         let speed = match play_step {
@@ -381,6 +373,6 @@ fn main() {
         input_role_state.update_history();
         t_count += 1;
     }
-    audio_device_a.pause();
+    audio_device_a.set_silent_data();
     sdl_context.mouse().show_cursor(true);
 }
