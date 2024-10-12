@@ -1,4 +1,4 @@
-pub const ENVELOPE_TBL: &[&[u8]] = &[
+pub const ENVELOPE_TBL: &[&[i32]] = &[
     &[0x0f, 0x10],
     &[0x0c, 0x10],
     &[0x0a, 0x10],

@@ -11,7 +11,7 @@ use sound_index::*;
 struct ChRegisters {
     wave_form: usize,
     freq: i32,
-    gain: u16,
+    gain: i32,
 }
 
 impl ChRegisters {
@@ -21,7 +21,7 @@ impl ChRegisters {
         self.gain = 0;
     }
 
-    fn get_registers(&self) -> (usize, i32, u16) {
+    fn get_registers(&self) -> (usize, i32, i32) {
         (self.wave_form, self.freq, self.gain)
     }
 }
@@ -125,7 +125,7 @@ impl<'a> SoundManager<'a> {
         self.clear_ch_registers();
     }
 
-    pub fn get_ch_registers(&self) -> [(usize, i32, u16); 8] {
+    pub fn get_ch_registers(&self) -> [(usize, i32, i32); 8] {
         [
             self.registers[0].get_registers(),
             self.registers[1].get_registers(),
@@ -241,13 +241,13 @@ impl<'a> SoundManager<'a> {
                             let g = ENVELOPE_TBL[envelope][env_pos];
                             let gain = match g {
                                 0x10 => {
-                                    let gain = ENVELOPE_TBL[envelope][env_pos - 1] as u16;
+                                    let gain = ENVELOPE_TBL[envelope][env_pos - 1] as i32;
                                     gain
                                 },
                                 0x11 => {
                                     let gain = group[part_no].pre_data.gain;
                                     if gain > 0 {
-                                        if (gain - 1) <= ENVELOPE_TBL[envelope][env_pos + 1] as u16 {
+                                        if (gain - 1) <= ENVELOPE_TBL[envelope][env_pos + 1] {
                                             group[part_no].envelope_read_pos += 1;
                                         }
                                         gain - 1
@@ -262,7 +262,7 @@ impl<'a> SoundManager<'a> {
                                     if remain > gain as usize {
                                         gain
                                     } else {
-                                        (remain - 1) as u16
+                                        (remain - 1) as i32
                                     }
                                 },
                                 0x13 => {
@@ -277,7 +277,7 @@ impl<'a> SoundManager<'a> {
                                 },
                                 _ => {
                                     group[part_no].envelope_read_pos += 1;
-                                    g as u16
+                                    g
                                 },
                             };
                             group[part_no].pre_data.gain = gain;

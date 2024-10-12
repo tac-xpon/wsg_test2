@@ -1,6 +1,6 @@
 [package]
-name = "wsg_test"
-version = "0.6.5"
+name = "wsg_test2"
+version = "0.1.0"
 edition = "2021"
 
 [dependencies]
@@ -9,7 +9,6 @@ piston_window = "0.132"
 pistoncore-sdl2_window = "0.69"
 
 bgsp-lib2 = { path = "../bgsp-lib2", version = "0.3" }
-audio-lib3 = { path = "../audio-lib3", version = "0.3.1" }
 
 [features]
 default = []

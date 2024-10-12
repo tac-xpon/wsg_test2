@@ -14,7 +14,8 @@ mod wait_and_update;
 
 use bgsp_lib2::{bg_plane::*, bgsp_common::*, sp_resources::*};
 
-use audio_lib3::*;
+mod audio_lib4;
+use audio_lib4::*;
 
 mod sound_generator;
 use sound_generator::*;
@@ -40,9 +41,9 @@ const MAX_SPRITES: usize = 128;
 const SAMPLING_FREQ: i32 = 48000;
 // const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
 const SOUND_BUF_SIZE: usize = 8192;
-const NUM_BUFFERING_FRAME: usize = 3;
+const NUM_BUFFERING_FRAME: usize = 2;
 const NUM_OF_AUDIO_CHANNELS: usize = 8;
-const FREQ_ADJ_RATIO: f64 = 43.69; // 0x10000(=65536) -> 1500Hz
+const FREQ_ADJ_RATIO: f64 = 65536.0 / 1500.0; // 65536(=0x10000) -> 1500Hz
 
 fn main() {
     let sdl_context = sdl2::init().unwrap();
@@ -146,7 +147,7 @@ fn main() {
     let mut audio_context = AudioContext::with_subsystem(audio_subsystem);
     audio_context.set_freq(Some(SAMPLING_FREQ));
     audio_context.set_channels(Some(1));
-    audio_context.set_samples(Some(256));
+    audio_context.set_samples(Some(512));
     let mut audio_device_a = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
 
     if game_window.full_screen() {
@@ -186,7 +187,7 @@ fn main() {
 
     let mut sound_manager = SoundManager::default();
     sound_manager.suppress_last_silence = suppress_last;
-    let mut sound_generator = SoundGenerator::new(SAMPLING_FREQ, Some(SOUND_BUF_SIZE), Some(FREQ_ADJ_RATIO));
+    let mut sound_generator = SoundGenerator::new(SAMPLING_FREQ);
 
     audio_device_a.set_volume(master_volume);
     audio_device_a.resume();
