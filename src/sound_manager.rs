@@ -241,7 +241,7 @@ impl<'a> SoundManager<'a> {
                             let g = ENVELOPE_TBL[envelope][env_pos];
                             let gain = match g {
                                 0x10 => {
-                                    let gain = ENVELOPE_TBL[envelope][env_pos - 1] as i32;
+                                    let gain = ENVELOPE_TBL[envelope][env_pos - 1];
                                     gain
                                 },
                                 0x11 => {
