@@ -13,9 +13,9 @@ const WAVE_0: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -34,9 +34,9 @@ const WAVE_1: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -55,9 +55,9 @@ const WAVE_2: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -76,9 +76,9 @@ const WAVE_3: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -97,9 +97,9 @@ const WAVE_4: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -118,9 +118,9 @@ const WAVE_5: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -139,9 +139,9 @@ const WAVE_6: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
@@ -160,9 +160,9 @@ const WAVE_7: [i16; WAVE_DATA_LENGTH] = {
     let mut wave: [i16; WAVE_DATA_LENGTH] = [0; WAVE_DATA_LENGTH];
     let mut idx = 0;
     while idx < WAVE_DATA_LENGTH {
-        let s = SAMPLES[idx];
+        let s = SAMPLES[idx] as i32;
         wave[idx] = if s < 0x0f {
-            ((((SAMPLES[idx] + 1) as i32) << 12) - SETUP_U16) as i16
+            (((s + 1) << 12) - SETUP_U16) as i16
         } else {
             i16::MAX
         };
