@@ -101,7 +101,6 @@ impl SoundGenerator {
             if g == 0 && unit.current_gain == 0x0_00 {
                 unit.phase_pos = 0;
                 unit.current_wave_form = None;
-                unit.current_gain = 0x0_00;
                 unit.current_freq = 0;
             } else {
                 let specified_gain = if self.mute[ch] || f == 0 { 0x0_00 } else { g * 0x1_00 };
@@ -109,8 +108,9 @@ impl SoundGenerator {
                     if unit.current_freq == 0 {
                         unit.current_freq = f;
                     };
-                    let pos = (unit.phase_pos / INTERNAL_SAMPLE_LENGTH) as usize;
                     let wave_form_no = if let Some(current_w) = unit.current_wave_form { current_w } else { w };
+                    let pos = (unit.phase_pos / INTERNAL_SAMPLE_LENGTH) as usize;
+                    let a = WAVE_FORMS[wave_form_no][pos] as i32;
                     unit.phase_pos += unit.current_freq;
                     if unit.phase_pos >= INTERNAL_WAVE_LENGTH {
                         unit.phase_pos -= INTERNAL_WAVE_LENGTH;
@@ -130,7 +130,6 @@ impl SoundGenerator {
                             }
                         }
                     }
-                    let a = WAVE_FORMS[wave_form_no][pos] as i32;
                     *dist += a * unit.current_gain / 0xf_00;
                 }
             }
