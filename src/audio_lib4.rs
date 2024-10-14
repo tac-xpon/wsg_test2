@@ -116,7 +116,7 @@ impl AudioCallback for Sound {
                 let output = if self.mute || self.volume == 0 {
                     0
                 } else {
-                let pos = self.current % self.buf_size;
+                    let pos = self.current % self.buf_size;
                     let singed_sample = *self.buffer.get(pos).unwrap_or(&(0));
                     let scaled_singed_sample = match self.volume {
                         0 => 0,
