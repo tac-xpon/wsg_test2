@@ -39,9 +39,8 @@ const BG1_RECT_SIZE: (i32, i32) = (40, 30);
 const MAX_SPRITES: usize = 128;
 
 const SAMPLING_FREQ: i32 = 48000;
-// const SAMPLES_PER_FRAME: usize = SAMPLING_FREQ as usize / 60;
 const SOUND_BUF_SIZE: usize = 8192;
-const NUM_BUFFERING_FRAME: usize = 2;
+const NUM_BUFFERING_FRAME: usize = 1;
 const NUM_OF_AUDIO_CHANNELS: usize = 8;
 const FREQ_ADJ_RATIO: f64 = 65536.0 / 1500.0; // 65536(=0x10000) -> 1500Hz
 
@@ -146,9 +145,11 @@ fn main() {
 
     let mut audio_context = AudioContext::with_subsystem(audio_subsystem);
     audio_context.set_freq(Some(SAMPLING_FREQ));
-    audio_context.set_channels(Some(1));
+    audio_context.set_channels(Some(2)); // Stereo
     audio_context.set_samples(Some(512));
-    let mut audio_device_a = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
+    let mut audio_device = audio_context.open_device(SOUND_BUF_SIZE).unwrap();
+    audio_device.pause();
+    audio_device.set_volume(7);
 
     if game_window.full_screen() {
         sdl_context.mouse().show_cursor(false);
@@ -159,13 +160,15 @@ fn main() {
     {
         let s = "Test for WSG Play".to_string();
         let x = (VM_RECT_SIZE.0 - s.len() as i32) / 2;
-        bg.1.set_cur_pos(x,  0).put_string(&s,    Some(&CharAttributes::new(3, BgSymmetry::Normal)));
-        bg.1.set_cur_pos(3,  4).put_achar(&AChar::new(0x80 as u32, 4, BgSymmetry::Normal));
+        bg.1.set_cur_pos(x, 0).put_string(&s, Some(&CharAttributes::new(3, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(1, 4).put_achar(&AChar::new('C', 4, BgSymmetry::Normal));
+        bg.1.set_cur_pos(4, 4).put_achar(&AChar::new(0x80 as u32, 4, BgSymmetry::Normal));
         for i in 0..8 {
             let y = 6 + i as i32 * 2;
             let achar = AChar::new('0' as u32 + i, 4, BgSymmetry::Normal);
-            bg.1.set_cur_pos( 3, y).put_achar(&achar).put_achar(&AChar::new(':', 1, BgSymmetry::Normal));
-            bg.1.set_cur_pos(16, y).put_palette_n(3, 18).put_palette(2);
+            bg.1.set_cur_pos( 0, y).put_string("LCR", Some(&CharAttributes::new(5, BgSymmetry::Normal)));
+            bg.1.set_cur_pos( 4, y).put_achar(&achar).put_achar(&AChar::new(':', 1, BgSymmetry::Normal));
+            bg.1.set_cur_pos(17, y).put_palette_n(3, 18).put_palette(2);
         }
         bg.1.set_cur_pos(8, 3).put_string(&"LastFrame", None);
         bg.1.set_achar_at(12, 4, &AChar::new(0x7fu32, 4, BgSymmetry::Normal));
@@ -179,7 +182,7 @@ fn main() {
 
     let mut t_count = 0;
     let mut pointer_pos = (0.0, 0.0);
-    let mut master_volume = 4;
+    let mut master_gain = 4;
     let mut music_select = 0;
     let mut music_playing = None;
     let mut play_step = 1;
@@ -188,13 +191,13 @@ fn main() {
     let mut sound_manager = SoundManager::default();
     sound_manager.suppress_last_silence = suppress_last;
     let mut sound_generator = SoundGenerator::new(SAMPLING_FREQ);
-
-    audio_device_a.set_volume(master_volume);
-    audio_device_a.resume();
+    let samples_per_frame_2ch = sound_generator.samples_per_frame() * 2;
 
     input_role_state.clear_all();
-    audio_device_a.set_silent_data();
+    audio_device.set_silent_data();
+    audio_device.resume();
     'main_loop: loop {
+        sound_generator.master_gain = master_gain;
         if t_count % play_step == 0 {
             sound_manager.run();
         }
@@ -202,9 +205,11 @@ fn main() {
         if t_count % play_step == play_step - 1 {
             sound_manager.clear_ch_registers();
         }
-        while audio_device_a.remain() < sound_generator.samples_per_frame() * NUM_BUFFERING_FRAME {
+        let mut buffer_remain = audio_device.remain();
+        while buffer_remain < samples_per_frame_2ch * (NUM_BUFFERING_FRAME + 1) {
             sound_generator.generate(&sound_data);
-            audio_device_a.push_data(sound_generator.mixed_buffer());
+            audio_device.push_data(sound_generator.mixed_buffer());
+            buffer_remain += samples_per_frame_2ch;
         }
 
         let (m_pos_spx, m_pos_spy) = (pointer_pos.0 as i32 / PIXEL_SCALE, pointer_pos.1 as i32 / PIXEL_SCALE);
@@ -248,6 +253,21 @@ fn main() {
                     suppress_last = !suppress_last;
                     sound_manager.suppress_last_silence = suppress_last;
                 }
+                if achar.code == 'L' as u32 {
+                    sound_generator.panpot[(m_pos_bgy - 6) as usize / 2] = PanPot::Left;
+                }
+                if achar.code == 'C' as u32 {
+                    if m_pos_bgy < 6 {
+                        for panpod in sound_generator.panpot.iter_mut() {
+                            *panpod = PanPot::Center;
+                        }
+                    } else {
+                        sound_generator.panpot[(m_pos_bgy - 6) as usize / 2] = PanPot::Center;
+                    }
+                }
+                if achar.code == 'R' as u32 {
+                    sound_generator.panpot[(m_pos_bgy - 6) as usize / 2] = PanPot::Right;
+                }
             }
         }
 
@@ -258,15 +278,13 @@ fn main() {
             music_select = if music_select == 31 { 0 } else { music_select + 1 };
         }
         if input_role_state.get(InputRole::Up).1 & 0b1111 == 0b0011 {
-            if master_volume < 7 {
-                master_volume += 1;
-                audio_device_a.set_volume(master_volume);
+            if master_gain < 7 {
+                master_gain += 1;
             }
         }
         if input_role_state.get(InputRole::Down).1 & 0b1111 == 0b0011 {
-            if master_volume > 0 {
-                master_volume -= 1;
-                audio_device_a.set_volume(master_volume);
+            if master_gain > 0 {
+                master_gain -= 1;
             }
         }
         if input_role_state.get(InputRole::Start).1 & 0b1111 == 0b0011 {
@@ -313,9 +331,11 @@ fn main() {
             let freq = f as f64 / FREQ_ADJ_RATIO;
             let gain = if sound_generator.mute[ch] || freq <= 30.0 { 0 } else { g as i32 };
             let y = (6 + ch * 2) as i32;
-            bg.1.set_palette_at(3, y, if sound_generator.mute[ch] { 5 } else { 4 });
-            bg.1.set_cur_pos( 5, y).put_string(&format!("{:7.2}Hz {:1} {:2} ", freq, w, gain), None);
-            bg.1.set_cur_pos(20, y).put_code_n(0x7f as u32, gain).put_code_n(' ', 15 - gain);
+            bg.1.set_palette_n_at(0, y, 5, 3);
+            bg.1.set_palette_at(1 + sound_generator.panpot[ch] as i32, y, 3);
+            bg.1.set_palette_at(4, y, if sound_generator.mute[ch] { 5 } else { 4 });
+            bg.1.set_cur_pos( 6, y).put_string(&format!("{:7.2}Hz {:1} {:2} ", freq, w, gain), None);
+            bg.1.set_cur_pos(21, y).put_code_n(0x7f as u32, gain).put_code_n(' ', 15 - gain);
         }
         bg.1.set_cur_pos(4, 22);
         for music_no in 0..0x20 {
@@ -340,9 +360,9 @@ fn main() {
                 println!("{:?}", sound_manager.play_request);
             }
         }
-        bg.1.set_cur_pos(24, 2).put_string(&format!("{:9} {:6}", audio_device_a.current(), audio_device_a.remain()), Some(&CharAttributes::new(2, BgSymmetry::Normal)));
+        bg.1.set_cur_pos(24, 2).put_string(&format!("{:9} {:6}", audio_device.current(), audio_device.remain()), Some(&CharAttributes::new(2, BgSymmetry::Normal)));
         bg.1.set_cur_pos(36, 3).put_string(&format!("{:02X}", music_select), None);
-        bg.1.set_cur_pos(37, 4).put_string(&format!("{:1}", master_volume), None);
+        bg.1.set_cur_pos(37, 4).put_string(&format!("{:1}", master_gain), None);
         let speed = match play_step {
             1 => 100,
             2 => 50,
@@ -374,6 +394,6 @@ fn main() {
         input_role_state.update_history();
         t_count += 1;
     }
-    audio_device_a.set_silent_data();
+    audio_device.set_silent_data();
     sdl_context.mouse().show_cursor(true);
 }
