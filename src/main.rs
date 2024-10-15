@@ -258,8 +258,8 @@ fn main() {
                 }
                 if achar.code == 'C' as u32 {
                     if m_pos_bgy < 6 {
-                        for panpod in sound_generator.panpot.iter_mut() {
-                            *panpod = PanPot::Center;
+                        for panpot in sound_generator.panpot.iter_mut() {
+                            *panpot = PanPot::Center;
                         }
                     } else {
                         sound_generator.panpot[(m_pos_bgy - 6) as usize / 2] = PanPot::Center;
@@ -271,10 +271,12 @@ fn main() {
             }
         }
 
-        if input_role_state.get(InputRole::Left).1 & 0b1111 == 0b0011 {
+        if input_role_state.get(InputRole::Left).1 & 0b1111 == 0b0011
+        || input_role_state.get(InputRole::Left).1 & 0xfff_ffff == 0xfff_ffff && t_count % 4 == 0 {
             music_select = if music_select == 0 { 31 } else { music_select -1 };
         }
-        if input_role_state.get(InputRole::Right).1 & 0b1111 == 0b0011 {
+        if input_role_state.get(InputRole::Right).1 & 0b1111 == 0b0011
+        || input_role_state.get(InputRole::Right).1 & 0xfff_ffff == 0xfff_ffff && t_count % 4 == 0 {
             music_select = if music_select == 31 { 0 } else { music_select + 1 };
         }
         if input_role_state.get(InputRole::Up).1 & 0b1111 == 0b0011 {
