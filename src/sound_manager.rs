@@ -292,7 +292,10 @@ impl<'a> SoundManager<'a> {
             }
             for part_no in 0..score[idx].len() {
                 registers[start_ch + part_no] = ChRegisters { ..group[part_no].pre_data };
-                group[part_no].remain_frames -= 1; // !! usize がアンダーフロー(0以下)になるケース有り !!
+                if group[part_no].remain_frames == 0 {  // アンダーフロー対策
+                    continue;
+                }
+                group[part_no].remain_frames -= 1;
                 if group[part_no].remain_frames == 0 {
                     group[part_no].read_adr = &group[part_no].read_adr[2..];
                     // 独自実装：末尾の無音１フレームを出力しない
